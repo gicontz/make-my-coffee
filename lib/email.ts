@@ -83,10 +83,17 @@ export async function sendOrderEmails(data: OrderEmailData) {
   const { orderId, customer, items, subtotal, shipping, total } = data
   const customerName = `${customer.firstName} ${customer.lastName}`
 
+  // Staff to BCC on the admin notification (comma-separated env)
+  const staffBcc = (process.env.BCC_EMAIL ?? '')
+    .split(',')
+    .map(e => e.trim())
+    .filter(Boolean)
+
   // ── Admin notification ──
   await transporter.sendMail({
     from: `"Make My Coffee" <${process.env.GMAIL_USER}>`,
     to: process.env.ADMIN_EMAIL,
+    ...(staffBcc.length ? { bcc: staffBcc } : {}),
     subject: `New Order #${orderId} — ${customerName}`,
     html: base(`
       <h2 style="margin:0 0 4px;color:#1C0A00;font-size:22px;">New Order Received</h2>
