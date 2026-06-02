@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
+import { calcShipping } from '@/lib/shipping'
 
 type Form = {
   firstName: string
@@ -19,15 +20,8 @@ type Form = {
 }
 
 const INITIAL_FORM: Form = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  address: '',
-  city: '',
-  province: '',
-  postalCode: '',
-  notes: '',
+  firstName: '', lastName: '', email: '', phone: '',
+  address: '', city: '', province: '', postalCode: '', notes: '',
 }
 
 const inputCls =
@@ -36,23 +30,54 @@ const inputCls =
 export default function OrderPage() {
   const { items, total, clearCart } = useCart()
   const [form, setForm] = useState<Form>(INITIAL_FORM)
-  const [orderPlaced, setOrderPlaced] = useState(false)
+  const [orderId, setOrderId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const shipping = total >= 1000 ? 0 : 99
+  const shipping = calcShipping(form.city, total)
   const orderTotal = total + shipping
+
+  // guard: don't run on server
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setOrderPlaced(true)
-    clearCart()
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: form,
+          items: items.map(i => ({
+            id: i.product.id,
+            name: i.product.name,
+            shots: i.product.shots,
+            price: i.product.price,
+            quantity: i.quantity,
+          })),
+          subtotal: total,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to place order')
+      clearCart()
+      setOrderId(data.orderId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  /* ── Success screen ── */
-  if (orderPlaced) {
+  /* ── Success ── */
+  if (orderId) {
     return (
       <div className="min-h-screen bg-espresso-50 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
@@ -62,22 +87,17 @@ export default function OrderPage() {
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
           </div>
-          <h2
-            className="text-espresso-900 text-3xl font-bold mb-3"
-            style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-          >
-            Order Received!
+          <h2 className="text-espresso-900 text-3xl font-bold mb-2" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
+            Order Placed!
           </h2>
+          <p className="text-espresso-500 text-sm mb-1">Order <span className="font-semibold text-espresso-700">#{orderId}</span></p>
           <p className="text-espresso-600 mb-2">
-            Thank you! We'll reach out to <span className="font-semibold text-espresso-800">{form.email}</span> once your Aconchego shots are on their way.
+            A confirmation has been sent to <span className="font-semibold">{form.email}</span>.
           </p>
           <p className="text-espresso-400 text-sm mb-8">
-            Payment processing is coming soon — we'll confirm your details via email.
+            Payment is <strong>Cash on Delivery</strong>. Please have ₱{orderTotal.toLocaleString()} ready when your order arrives.
           </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors"
-          >
+          <Link href="/" className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors">
             Back to Home
           </Link>
         </div>
@@ -85,21 +105,14 @@ export default function OrderPage() {
     )
   }
 
-  /* ── Empty cart guard ── */
-  if (items.length === 0) {
+  /* ── Empty cart ── */
+  if (hydrated && items.length === 0) {
     return (
       <div className="min-h-screen bg-espresso-50 flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
-          <h2
-            className="text-espresso-900 text-2xl font-bold mb-3"
-            style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-          >
-            Nothing to order
-          </h2>
-          <p className="text-espresso-500 mb-8">Your cart is empty. Add some espresso shots first!</p>
-          <Link href="/shop" className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors">
-            Go to Shop
-          </Link>
+          <h2 className="text-espresso-900 text-2xl font-bold mb-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>Nothing to order</h2>
+          <p className="text-espresso-500 mb-8">Your cart is empty.</p>
+          <Link href="/shop" className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors">Go to Shop</Link>
         </div>
       </div>
     )
@@ -115,10 +128,7 @@ export default function OrderPage() {
             <span>›</span>
             <span className="text-espresso-300">Checkout</span>
           </div>
-          <h1
-            className="text-4xl font-bold text-espresso-50"
-            style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-          >
+          <h1 className="text-4xl font-bold text-espresso-50" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
             Place Your Order
           </h1>
         </div>
@@ -126,46 +136,35 @@ export default function OrderPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-4 text-sm">
+              {error}
+            </div>
+          )}
 
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             {/* ── Left: form ── */}
             <div className="lg:col-span-3 space-y-6">
 
               {/* Contact */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
-                <h2
-                  className="text-espresso-900 font-bold text-xl mb-6 flex items-center gap-3"
-                  style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-                >
+                <h2 className="text-espresso-900 font-bold text-xl mb-6 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
                   <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">1</span>
                   Contact Information
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">First Name *</label>
-                    <input type="text" name="firstName" value={form.firstName} onChange={handleChange} required className={inputCls} placeholder="Juan" />
-                  </div>
-                  <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Last Name *</label>
-                    <input type="text" name="lastName" value={form.lastName} onChange={handleChange} required className={inputCls} placeholder="dela Cruz" />
-                  </div>
-                  <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Email *</label>
-                    <input type="email" name="email" value={form.email} onChange={handleChange} required className={inputCls} placeholder="juan@example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Phone *</label>
-                    <input type="tel" name="phone" value={form.phone} onChange={handleChange} required className={inputCls} placeholder="+63 912 345 6789" />
-                  </div>
+                  {([['firstName','First Name','Juan'], ['lastName','Last Name','dela Cruz'], ['email','Email','juan@example.com'], ['phone','Phone','+63 912 345 6789']] as [keyof Form, string, string][]).map(([name, label, ph]) => (
+                    <div key={name}>
+                      <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">{label} *</label>
+                      <input type={name === 'email' ? 'email' : name === 'phone' ? 'tel' : 'text'} name={name} value={form[name]} onChange={handleChange} required className={inputCls} placeholder={ph} />
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Delivery */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
-                <h2
-                  className="text-espresso-900 font-bold text-xl mb-6 flex items-center gap-3"
-                  style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-                >
+                <h2 className="text-espresso-900 font-bold text-xl mb-6 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
                   <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">2</span>
                   Delivery Address
                 </h2>
@@ -177,7 +176,7 @@ export default function OrderPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">City *</label>
-                      <input type="text" name="city" value={form.city} onChange={handleChange} required className={inputCls} placeholder="Manila" />
+                      <input type="text" name="city" value={form.city} onChange={handleChange} required className={inputCls} placeholder="Pasig" />
                     </div>
                     <div>
                       <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Province *</label>
@@ -185,54 +184,45 @@ export default function OrderPage() {
                     </div>
                     <div>
                       <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Postal Code *</label>
-                      <input type="text" name="postalCode" value={form.postalCode} onChange={handleChange} required className={inputCls} placeholder="1000" />
+                      <input type="text" name="postalCode" value={form.postalCode} onChange={handleChange} required className={inputCls} placeholder="1600" />
                     </div>
                   </div>
+                  {/* Free shipping nudge */}
+                  {form.city && calcShipping(form.city, total) === 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-green-700 text-sm flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                      Free delivery to Pasig City on orders ₱1,000+!
+                    </div>
+                  )}
                   <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Order Notes (optional)</label>
-                    <textarea
-                      name="notes"
-                      value={form.notes}
-                      onChange={handleChange}
-                      rows={3}
-                      className={`${inputCls} resize-none`}
-                      placeholder="Any special instructions for your order..."
-                    />
+                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Notes (optional)</label>
+                    <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className={`${inputCls} resize-none`} placeholder="Any special instructions…" />
                   </div>
                 </div>
               </div>
 
-              {/* Payment placeholder */}
+              {/* COD */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
-                <h2
-                  className="text-espresso-900 font-bold text-xl mb-6 flex items-center gap-3"
-                  style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-                >
+                <h2 className="text-espresso-900 font-bold text-xl mb-5 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
                   <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
                   Payment
                 </h2>
-
-                <div className="border-2 border-dashed border-espresso-200 rounded-2xl p-8 text-center">
-                  {/* PayPal logo-ish */}
-                  <div className="w-14 h-14 bg-[#003087]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#003087">
-                      <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.59 3.025-2.566 6.082-8.558 6.082h-2.19a.973.973 0 00-.96.82L7.686 21.337h3.653l.93-5.89a.973.973 0 01.96-.82h.619c3.925 0 6.993-1.595 7.892-6.203.35-1.793.108-3.265-.518-4.307z"/>
+                <div className="flex items-start gap-4 bg-espresso-50 border border-espresso-200 rounded-2xl p-5">
+                  <div className="w-12 h-12 bg-espresso-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C3317" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="6" width="20" height="12" rx="2"/>
+                      <circle cx="12" cy="12" r="2"/>
+                      <path d="M6 12h.01M18 12h.01"/>
                     </svg>
                   </div>
-                  <h3
-                    className="text-espresso-900 font-bold text-lg mb-2"
-                    style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-                  >
-                    PayPal
-                  </h3>
-                  <p className="text-espresso-400 text-sm mb-4">Secure payment via PayPal — coming soon.</p>
-                  <div className="inline-flex items-center gap-1.5 bg-espresso-50 border border-espresso-200 text-espresso-400 text-xs px-4 py-2 rounded-full">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="12" y1="8" x2="12" y2="12"/>
-                      <line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    Payment integration in progress
+                  <div>
+                    <p className="text-espresso-900 font-bold mb-1">Cash on Delivery</p>
+                    <p className="text-espresso-600 text-sm">Pay in cash when your order arrives. No upfront payment required.</p>
+                  </div>
+                  <div className="ml-auto flex-shrink-0">
+                    <div className="w-5 h-5 rounded-full border-2 border-espresso-400 bg-espresso-400 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -241,12 +231,7 @@ export default function OrderPage() {
             {/* ── Right: summary ── */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-2xl shadow-sm border border-espresso-100 p-6 sticky top-24">
-                <h2
-                  className="text-espresso-900 font-bold text-xl mb-6"
-                  style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
-                >
-                  Order Summary
-                </h2>
+                <h2 className="text-espresso-900 font-bold text-xl mb-6" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>Order Summary</h2>
 
                 <div className="space-y-4 mb-5">
                   {items.map(item => (
@@ -279,27 +264,35 @@ export default function OrderPage() {
                       {shipping === 0 ? 'Free' : `₱${shipping}`}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-espresso-500">Tax</span>
-                    <span className="text-espresso-400 text-xs">Calculated at payment</span>
-                  </div>
                 </div>
 
                 <div className="border-t border-espresso-200 pt-4 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-espresso-900 font-bold text-lg">Total</span>
+                    <span className="text-espresso-900 font-bold text-lg">Total (COD)</span>
                     <span className="text-espresso-900 font-bold text-xl">₱{orderTotal.toLocaleString()}</span>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold py-4 rounded-full transition-colors shadow-lg text-base"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 bg-espresso-900 hover:bg-espresso-700 disabled:opacity-60 text-espresso-50 font-bold py-4 rounded-full transition-colors shadow-lg text-base"
                 >
-                  Place Order
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                      </svg>
+                      Placing Order…
+                    </>
+                  ) : (
+                    <>
+                      Place Order
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </>
+                  )}
                 </button>
 
                 <div className="flex items-center justify-center gap-5 mt-4 text-espresso-400 text-[11px]">
@@ -313,7 +306,7 @@ export default function OrderPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-                    Guaranteed
+                    COD
                   </span>
                 </div>
               </div>
