@@ -32,7 +32,9 @@ function createTransport() {
     service: 'gmail',
     auth: {
       user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      // Gmail app passwords are shown in 4 space-separated groups for
+      // readability; the spaces aren't part of the secret — strip them.
+      pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ''),
     },
   })
 }
