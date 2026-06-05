@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-05T00:00:00.000Z",
+  "title": "Design System: Make My Coffee",
+  "extensions": {
+    "colorMeta": {
+      "caramel-gold": {
+        "role": "primary",
+        "displayName": "Caramel Gold",
+        "canonical": "#C8860A",
+        "tonalRamp": ["#1C0A00", "#2C1810", "#5C3317", "#8B5E0A", "#A86E08", "#C8860A", "#D4A96A", "#E8C9A0"]
+      },
+      "espresso-noir": {
+        "role": "neutral",
+        "displayName": "Espresso Noir",
+        "canonical": "#1C0A00",
+        "tonalRamp": ["#1C0A00", "#2C1810", "#5C3317", "#8B5E0A", "#A86E08", "#C8860A", "#D4A96A", "#E8C9A0"]
+      },
+      "porcelain": {
+        "role": "neutral",
+        "displayName": "Porcelain",
+        "canonical": "#FAF6F1",
+        "tonalRamp": ["#5C3317", "#8B5E0A", "#A86E08", "#C8860A", "#D4A96A", "#E8C9A0", "#F5E6D3", "#FAF6F1"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Delivery Green",
+        "canonical": "#16A34A",
+        "tonalRamp": ["#052E16", "#14532D", "#166534", "#15803D", "#16A34A", "#22C55E", "#86EFAC", "#DCFCE7"]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Error Red",
+        "canonical": "#B91C1C",
+        "tonalRamp": ["#450A0A", "#7F1D1D", "#991B1B", "#B91C1C", "#DC2626", "#EF4444", "#FCA5A5", "#FEE2E2"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headline only. Playfair Display, one per page, ceiling ~4.5rem." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles in Playfair Display." },
+      "title": { "displayName": "Title", "purpose": "Card/product names and modal titles in Playfair Display." },
+      "body": { "displayName": "Body", "purpose": "Inter paragraph copy, measure capped at 65-75ch." },
+      "label": { "displayName": "Label", "purpose": "Uppercase tracked Inter for field labels, status pills, brand tagline. Not a reflex section eyebrow." }
+    },
+    "shadows": [
+      { "name": "card-resting", "value": "0 1px 2px rgba(0,0,0,0.05)", "purpose": "Quiet lift under form cards and the order summary; usually paired with a border." },
+      { "name": "hover-lift", "value": "0 10px 15px -3px rgba(0,0,0,0.1)", "purpose": "Product cards and CTAs on hover; signals interactivity." },
+      { "name": "cta-glow", "value": "0 10px 15px -3px rgba(200,134,10,0.2)", "purpose": "Warm gold halo under the hero primary button on dark surfaces only." },
+      { "name": "overlay", "value": "0 25px 50px -12px rgba(0,0,0,0.25)", "purpose": "Modals and floating feature cards above the page." }
+    ],
+    "motion": [
+      { "name": "ease-state", "value": "ease", "purpose": "Default for color/opacity state transitions, ~200-300ms." },
+      { "name": "ease-spring-pop", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "The hero bottle-label hover pop; the only place a slight overshoot is allowed." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (Gold)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Highest-emphasis action (Shop Now, Add to Cart). Gold fill on dark surfaces.",
+      "html": "<button class=\"ds-btn-primary\">Shop Now<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M12 5l7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #C8860A; color: #1C0A00; font-family: Inter, system-ui, sans-serif; font-weight: 700; font-size: 1rem; padding: 16px 32px; border: none; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgba(200,134,10,0.2); cursor: pointer; transition: background 0.2s ease, transform 0.2s ease; } .ds-btn-primary:hover { background: #A86E08; } .ds-btn-primary:focus-visible { outline: 2px solid #C8860A; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Dark Button",
+      "kind": "button",
+      "refersTo": "button-dark",
+      "description": "Primary action on light pages (View Details, Place Order).",
+      "html": "<button class=\"ds-btn-dark\">Place Order</button>",
+      "css": ".ds-btn-dark { display: inline-flex; align-items: center; gap: 8px; background: #1C0A00; color: #FAF6F1; font-family: Inter, system-ui, sans-serif; font-weight: 700; font-size: 1rem; padding: 16px 32px; border: none; border-radius: 9999px; cursor: pointer; transition: background 0.2s ease; } .ds-btn-dark:hover { background: #5C3317; } .ds-btn-dark:focus-visible { outline: 2px solid #C8860A; outline-offset: 2px; } .ds-btn-dark:disabled { opacity: 0.6; cursor: not-allowed; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Checkout field. White fill, sand border, gold focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Email *</span><input class=\"ds-input\" type=\"email\" placeholder=\"juan@example.com\" /></label>",
+      "css": ".ds-field { display: block; } .ds-field-label { display: block; font-family: Inter, system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5C3317; margin-bottom: 6px; } .ds-input { width: 100%; box-sizing: border-box; background: #FFFFFF; color: #1C0A00; font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; padding: 12px 16px; border: 1px solid #E8C9A0; border-radius: 12px; transition: border-color 0.2s ease, box-shadow 0.2s ease; } .ds-input::placeholder { color: #8B5E0A; } .ds-input:focus { outline: none; border-color: #C8860A; box-shadow: 0 0 0 2px rgba(200,134,10,0.2); }"
+    },
+    {
+      "name": "Product Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Storefront product card: cream image well, white body, hairline border, hover lift.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-well\">Aconchego</div><div class=\"ds-card-body\"><h3 class=\"ds-card-title\">Aconchego Classic</h3><p class=\"ds-card-desc\">Seven pure espresso shots for your daily ritual.</p><div class=\"ds-card-foot\"><span class=\"ds-card-price\">₱449</span><button class=\"ds-card-cta\">View Details</button></div></div></article>",
+      "css": ".ds-card { overflow: hidden; background: #FAF6F1; border: 1px solid #F5E6D3; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.3s ease, box-shadow 0.3s ease; max-width: 320px; } .ds-card:hover { border-color: #D4A96A; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); } .ds-card-well { height: 140px; display: flex; align-items: center; justify-content: center; background: #F5E6D3; color: #C8860A; font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.5rem; } .ds-card-body { padding: 24px; } .ds-card-title { margin: 0 0 4px; font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.25rem; color: #1C0A00; } .ds-card-desc { margin: 0 0 16px; font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.6; color: #5C3317; } .ds-card-foot { display: flex; align-items: center; justify-content: space-between; } .ds-card-price { font-family: Inter, system-ui, sans-serif; font-size: 1.5rem; font-weight: 700; color: #1C0A00; } .ds-card-cta { background: #1C0A00; color: #FAF6F1; font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; padding: 8px 16px; border: none; border-radius: 9999px; cursor: pointer; transition: background 0.2s ease; } .ds-card-cta:hover { background: #5C3317; }"
+    },
+    {
+      "name": "Tasting-Note Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Informational tag for tasting notes. Cream fill, cacao text, sand border.",
+      "html": "<span class=\"ds-chip\">Dark Chocolate</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; background: #F5E6D3; color: #5C3317; font-family: Inter, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; padding: 6px 16px; border: 1px solid #E8C9A0; border-radius: 9999px; }"
+    },
+    {
+      "name": "Badge",
+      "kind": "custom",
+      "refersTo": "badge",
+      "description": "Product callout badge (Most Popular, Best Value). Gold fill, espresso text.",
+      "html": "<span class=\"ds-badge\">Most Popular</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; background: #C8860A; color: #1C0A00; font-family: Inter, system-ui, sans-serif; font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 9999px; }"
+    },
+    {
+      "name": "Nav Link (on dark)",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Storefront top-bar link on espresso-noir background.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link\" href=\"#\">Home</a><a class=\"ds-nav-link\" href=\"#\">Shop</a></nav>",
+      "css": ".ds-nav { display: inline-flex; gap: 32px; background: #1C0A00; padding: 16px 24px; border-radius: 12px; } .ds-nav-link { font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; letter-spacing: 0.01em; color: #E8C9A0; text-decoration: none; transition: color 0.2s ease; } .ds-nav-link:hover { color: #D4A96A; } .ds-nav-link:focus-visible { outline: 2px solid #C8860A; outline-offset: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Warm Roastery",
+    "overview": "The interface should feel like stepping into a small, well-run roastery: deep roasted-espresso surfaces, caramel-gold light catching the edges, and pale cream paper for the working areas. The mood is calm and confident, never loud. The product is economical, but nothing here is allowed to read as cheap; affordability is communicated through clarity and restraint, not through promotional noise. The system runs on a single dominant axis: near-black espresso for atmosphere, caramel-gold as the rare spark. The intended direction is crisp and refined: hairline borders, restrained shadow, and tighter geometry than a soft consumer template, so an inexpensive product carries a considered, premium feeling.",
+    "keyCharacteristics": [
+      "Dark espresso atmosphere; cream working surfaces; gold as a scarce accent.",
+      "Playfair Display serif for every heading; Inter for everything else.",
+      "Mobile-first and thumb-first: the core customer is on a phone, paying cash on delivery.",
+      "Crisp and refined over soft and decorative; restraint is the premium signal.",
+      "WCAG 2.1 AA contrast is a hard floor, not a nice-to-have."
+    ],
+    "rules": [
+      { "name": "The One Spark Rule", "body": "Caramel Gold is the only bright accent and it appears on a small fraction of any screen: CTAs, the brand mark, badges, and large display highlights. The moment gold is carrying running text or filling large areas, it has stopped being the spark and the design has gone discount.", "section": "colors" },
+      { "name": "The Gold-on-Dark Rule", "body": "Caramel Gold is for fills, large display accents, and text on dark espresso surfaces. It is never small body text on white or cream: at small sizes on a light background it falls below AA. For small text on light, step up to Cacao (#5C3317) or darker.", "section": "colors" },
+      { "name": "The Serif-Headings Rule", "body": "Every heading is Playfair Display; body and UI text is always Inter. There is no third typeface.", "section": "typography" },
+      { "name": "The Sparing-Eyebrow Rule", "body": "The small uppercase tracked label is a real part of the system, but not an automatic eyebrow above every section. Use it for genuine labels, not as a reflexive section kicker.", "section": "typography" },
+      { "name": "The Border-First Rule", "body": "On light surfaces, define a card or field by its sand or cream border first; add shadow-sm only for a hint of lift. Heavy resting shadows read as a 2014 app and undercut the refined direction.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Caramel Gold (#C8860A) scarce: CTAs, the brand mark, badges, and large display highlights only.",
+      "Do use gold for text only on dark espresso surfaces; on light, use Cacao (#5C3317) or darker for small text.",
+      "Do set every heading in Playfair Display and everything else in Inter; never add a third typeface.",
+      "Do define light-surface cards and fields by a hairline sand/cream border first, with shadow-sm for a hint of lift.",
+      "Do hold body text and placeholders to WCAG AA (>=4.5:1); darken the current espresso-300 placeholder.",
+      "Do design mobile-first with >=44px tap targets and a prefers-reduced-motion fallback for every animation.",
+      "Do lead product sections with the made drinks and the mixing idea, not just the bottle."
+    ],
+    "donts": [
+      "Don't reach for the loud discount / sari-sari look: no neon, no stacked promo banners, no SALE!!!, no crowded screaming layouts.",
+      "Don't build the interchangeable Shopify-template DTC page: stock hero plus endless identical icon-heading-text card grids.",
+      "Don't drift toward cold corporate / tech-SaaS sterility; this is a warm food-and-drink brand.",
+      "Don't put a small uppercase tracked eyebrow above every section, and don't use numbered section markers (01 / 02 / 03) as default scaffolding.",
+      "Don't use Caramel Gold or Honey as small running text on white/cream (fails AA).",
+      "Don't use emoji as a brand visual; use real imagery or a crafted SVG mark.",
+      "Don't apply colored side-stripe borders (border-left/right > 1px) or gradient text; both are banned."
+    ]
+  }
+}
