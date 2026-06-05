@@ -57,14 +57,25 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<number | null>(null)
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
-    const res = await fetch(`/api/admin/orders?status=${filter}`)
-    const data = await res.json()
-    setOrders(data)
-    setLoading(false)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/orders?status=${filter}`)
+      if (!res.ok) throw new Error(`Couldn't load orders (status ${res.status})`)
+      const data = await res.json()
+      if (!Array.isArray(data)) throw new Error('Unexpected response from server')
+      setOrders(data)
+    } catch (err) {
+      console.error('Failed to load orders:', err)
+      setOrders([])
+      setError(err instanceof Error ? err.message : 'Failed to load orders')
+    } finally {
+      setLoading(false)
+    }
   }, [filter])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
@@ -106,6 +117,16 @@ export default function AdminOrders() {
 
       {loading ? (
         <div className="text-center py-20 text-espresso-400">Loading orders…</div>
+      ) : error ? (
+        <div className="text-center py-20">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={fetchOrders}
+            className="px-4 py-1.5 rounded-full text-sm font-medium bg-espresso-900 text-espresso-50 hover:bg-espresso-800 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-20 text-espresso-400">No orders found.</div>
       ) : (

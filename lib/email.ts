@@ -27,6 +27,9 @@ export interface OrderEmailData {
   total: number
 }
 
+// Web-safe stack — Outlook ignores `system-ui` and falls back to Times.
+const FONT = "Arial,'Helvetica Neue',Helvetica,sans-serif"
+
 function createTransport() {
   return nodemailer.createTransport({
     service: 'gmail',
@@ -40,43 +43,102 @@ function createTransport() {
 }
 
 function itemsTable(items: OrderItem[]): string {
+  const cell = `padding:10px 12px;border-bottom:1px solid #F5E6D3;font-family:${FONT};font-size:14px;color:#1C0A00;`
+  const head = `padding:10px 12px;font-family:${FONT};font-size:12px;color:#8B5E0A;text-transform:uppercase;letter-spacing:.05em;`
   const rows = items
     .map(
       item => `
         <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #F5E6D3;">${item.name} (${item.shots} shots)</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #F5E6D3;text-align:center;">×${item.quantity}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #F5E6D3;text-align:right;font-weight:600;">₱${(item.price * item.quantity).toLocaleString()}</td>
+          <td style="${cell}">${item.name} (${item.shots} shots)</td>
+          <td style="${cell}text-align:center;">×${item.quantity}</td>
+          <td style="${cell}text-align:right;font-weight:600;">₱${(item.price * item.quantity).toLocaleString()}</td>
         </tr>`
     )
     .join('')
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:16px 0;">
       <thead>
-        <tr style="background:#FAF6F1;">
-          <th style="padding:10px 12px;text-align:left;font-size:12px;color:#8B5E0A;text-transform:uppercase;letter-spacing:.05em;">Item</th>
-          <th style="padding:10px 12px;text-align:center;font-size:12px;color:#8B5E0A;text-transform:uppercase;letter-spacing:.05em;">Qty</th>
-          <th style="padding:10px 12px;text-align:right;font-size:12px;color:#8B5E0A;text-transform:uppercase;letter-spacing:.05em;">Price</th>
+        <tr>
+          <th bgcolor="#FAF6F1" align="left" style="${head}background:#FAF6F1;">Item</th>
+          <th bgcolor="#FAF6F1" align="center" style="${head}background:#FAF6F1;">Qty</th>
+          <th bgcolor="#FAF6F1" align="right" style="${head}background:#FAF6F1;">Price</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`
 }
 
+// Totals block (subtotal / shipping / total) shared by both emails.
+function totalsTable(subtotal: number, shipping: number, total: number, totalLabel: string, freeHtml: string): string {
+  const td = `padding:6px 0;font-family:${FONT};font-size:14px;color:#5C3317;`
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+      <tr><td style="${td}">Subtotal</td><td style="${td}text-align:right;">₱${subtotal.toLocaleString()}</td></tr>
+      <tr><td style="${td}">Shipping</td><td style="${td}text-align:right;">${shipping === 0 ? freeHtml : '₱' + shipping}</td></tr>
+      <tr>
+        <td style="padding:12px 0 0;border-top:2px solid #F5E6D3;font-family:${FONT};font-weight:700;font-size:16px;color:#1C0A00;">${totalLabel}</td>
+        <td style="padding:12px 0 0;border-top:2px solid #F5E6D3;font-family:${FONT};text-align:right;font-weight:700;font-size:18px;color:#C8860A;">₱${total.toLocaleString()}</td>
+      </tr>
+    </table>`
+}
+
+// Padded-cell button: padding lives on the <td> (Outlook honors it there,
+// not on <a>). Corners round everywhere except Outlook, which squares them.
+function button(href: string, label: string): string {
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+      <tr>
+        <td align="center" bgcolor="#1C0A00" style="background:#1C0A00;border-radius:99px;padding:12px 24px;">
+          <a href="${href}" style="font-family:${FONT};font-size:14px;font-weight:600;color:#F5E6D3;text-decoration:none;">${label}</a>
+        </td>
+      </tr>
+    </table>`
+}
+
+// Tinted info box as a single-cell table (div backgrounds/padding are unreliable in Outlook).
+function infoBox(bg: string, border: string, inner: string): string {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;background:${bg};border:1px solid ${border};border-radius:12px;">
+      <tr><td bgcolor="${bg}" style="background:${bg};padding:16px 20px;">${inner}</td></tr>
+    </table>`
+}
+
 function base(content: string): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#FAF6F1;font-family:system-ui,sans-serif;">
-  <div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
-    <div style="background:#1C0A00;padding:24px 32px;">
-      <p style="margin:0;color:#C8860A;font-size:12px;letter-spacing:.1em;text-transform:uppercase;">Make My Coffee</p>
-      <p style="margin:4px 0 0;color:#F5E6D3;font-size:20px;font-weight:700;">Aconchego Espresso Shots</p>
-    </div>
-    <div style="padding:32px;">${content}</div>
-    <div style="background:#FAF6F1;padding:16px 32px;text-align:center;">
-      <p style="margin:0;font-size:12px;color:#8B5E0A;">makemycoffee.cafe · Aconchego Signature Blend</p>
-    </div>
-  </div>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if mso]>
+  <style>table,td{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}</style>
+  <![endif]-->
+</head>
+<body style="margin:0;padding:0;background:#FAF6F1;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FAF6F1;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <!--[if mso]><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #F0E2D0;">
+          <tr>
+            <td bgcolor="#1C0A00" style="background:#1C0A00;padding:24px 32px;font-family:${FONT};">
+              <p style="margin:0;color:#C8860A;font-size:12px;letter-spacing:.1em;text-transform:uppercase;">Make My Coffee</p>
+              <p style="margin:4px 0 0;color:#F5E6D3;font-size:20px;font-weight:700;">Aconchego Espresso Shots</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;font-family:${FONT};color:#1C0A00;">${content}</td>
+          </tr>
+          <tr>
+            <td bgcolor="#FAF6F1" align="center" style="background:#FAF6F1;padding:16px 32px;font-family:${FONT};">
+              <p style="margin:0;font-size:12px;color:#8B5E0A;">makemycoffee.cafe · Aconchego Signature Blend</p>
+            </td>
+          </tr>
+        </table>
+        <!--[if mso]></td></tr></table><![endif]-->
+      </td>
+    </tr>
+  </table>
 </body></html>`
 }
 
@@ -91,6 +153,9 @@ export async function sendOrderEmails(data: OrderEmailData) {
     .map(e => e.trim())
     .filter(Boolean)
 
+  const detailRow = (label: string, value: string) =>
+    `<tr><td style="padding:6px 0;font-family:${FONT};color:#5C3317;font-size:13px;width:120px;">${label}</td><td style="padding:6px 0;font-family:${FONT};color:#1C0A00;">${value}</td></tr>`
+
   // ── Admin notification ──
   await transporter.sendMail({
     from: `"Make My Coffee" <${process.env.GMAIL_USER}>`,
@@ -98,33 +163,23 @@ export async function sendOrderEmails(data: OrderEmailData) {
     ...(staffBcc.length ? { bcc: staffBcc } : {}),
     subject: `New Order #${orderId} — ${customerName}`,
     html: base(`
-      <h2 style="margin:0 0 4px;color:#1C0A00;font-size:22px;">New Order Received</h2>
-      <p style="margin:0 0 24px;color:#8B5E0A;font-size:14px;">Order #${orderId}</p>
+      <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">New Order Received</h2>
+      <p style="margin:0 0 24px;font-family:${FONT};color:#8B5E0A;font-size:14px;">Order #${orderId}</p>
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-        <tr><td style="padding:6px 0;color:#5C3317;font-size:13px;width:120px;">Customer</td><td style="padding:6px 0;font-weight:600;color:#1C0A00;">${customerName}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;font-size:13px;">Email</td><td style="padding:6px 0;color:#1C0A00;">${customer.email}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;font-size:13px;">Phone</td><td style="padding:6px 0;color:#1C0A00;">${customer.phone}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;font-size:13px;">Address</td><td style="padding:6px 0;color:#1C0A00;">${customer.address}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;font-size:13px;">City</td><td style="padding:6px 0;color:#1C0A00;">${customer.city}, ${customer.province} ${customer.postalCode}</td></tr>
-        ${customer.notes ? `<tr><td style="padding:6px 0;color:#5C3317;font-size:13px;">Notes</td><td style="padding:6px 0;color:#1C0A00;">${customer.notes}</td></tr>` : ''}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+        ${detailRow('Customer', `<strong>${customerName}</strong>`)}
+        ${detailRow('Email', customer.email)}
+        ${detailRow('Phone', customer.phone)}
+        ${detailRow('Address', customer.address)}
+        ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
+        ${customer.notes ? detailRow('Notes', customer.notes) : ''}
       </table>
 
       ${itemsTable(items)}
 
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding:6px 0;color:#5C3317;">Subtotal</td><td style="padding:6px 0;text-align:right;">₱${subtotal.toLocaleString()}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;">Shipping</td><td style="padding:6px 0;text-align:right;">${shipping === 0 ? 'Free' : '₱' + shipping}</td></tr>
-        <tr style="border-top:2px solid #F5E6D3;">
-          <td style="padding:12px 0 0;font-weight:700;font-size:16px;color:#1C0A00;">Total (COD)</td>
-          <td style="padding:12px 0 0;text-align:right;font-weight:700;font-size:18px;color:#C8860A;">₱${total.toLocaleString()}</td>
-        </tr>
-      </table>
+      ${totalsTable(subtotal, shipping, total, 'Total (COD)', 'Free')}
 
-      <a href="${process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe'}/admin/orders"
-         style="display:inline-block;margin-top:24px;background:#1C0A00;color:#F5E6D3;text-decoration:none;padding:12px 24px;border-radius:99px;font-size:14px;font-weight:600;">
-        View in Admin →
-      </a>
+      ${button(`${process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe'}/admin/orders`, 'View in Admin →')}
     `),
   })
 
@@ -134,29 +189,26 @@ export async function sendOrderEmails(data: OrderEmailData) {
     to: customer.email,
     subject: `Order Confirmed #${orderId} — Make My Coffee`,
     html: base(`
-      <h2 style="margin:0 0 4px;color:#1C0A00;font-size:22px;">Thank you, ${customer.firstName}!</h2>
-      <p style="margin:0 0 24px;color:#5C3317;font-size:15px;">Your order <strong>#${orderId}</strong> has been received and is being prepared.</p>
+      <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">Thank you, ${customer.firstName}!</h2>
+      <p style="margin:0 0 24px;font-family:${FONT};color:#5C3317;font-size:15px;">Your order <strong>#${orderId}</strong> has been received and is being prepared.</p>
 
       ${itemsTable(items)}
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-        <tr><td style="padding:6px 0;color:#5C3317;">Subtotal</td><td style="padding:6px 0;text-align:right;">₱${subtotal.toLocaleString()}</td></tr>
-        <tr><td style="padding:6px 0;color:#5C3317;">Shipping</td><td style="padding:6px 0;text-align:right;">${shipping === 0 ? '<span style="color:#16a34a;font-weight:600;">Free</span>' : '₱' + shipping}</td></tr>
-        <tr style="border-top:2px solid #F5E6D3;">
-          <td style="padding:12px 0 0;font-weight:700;font-size:16px;color:#1C0A00;">Total to pay on delivery</td>
-          <td style="padding:12px 0 0;text-align:right;font-weight:700;font-size:18px;color:#C8860A;">₱${total.toLocaleString()}</td>
-        </tr>
-      </table>
+      ${totalsTable(subtotal, shipping, total, 'Total to pay on delivery', '<span style="color:#16a34a;font-weight:600;">Free</span>')}
 
-      <div style="background:#FAF6F1;border-radius:12px;padding:16px 20px;margin-bottom:24px;">
-        <p style="margin:0 0 4px;font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
-        <p style="margin:0;color:#5C3317;font-size:14px;">${customer.address}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>
-      </div>
+      ${infoBox(
+        '#FAF6F1',
+        '#F0E2D0',
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${customer.address}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>`
+      )}
 
-      <div style="background:#FFF8F0;border:1px solid #E8C9A0;border-radius:12px;padding:16px 20px;">
-        <p style="margin:0 0 4px;font-weight:600;color:#C8860A;">💵 Cash on Delivery</p>
-        <p style="margin:0;color:#5C3317;font-size:14px;">Please have <strong>₱${total.toLocaleString()}</strong> ready when your order arrives. No upfront payment required.</p>
-      </div>
+      ${infoBox(
+        '#FFF8F0',
+        '#E8C9A0',
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">💵 Cash on Delivery</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Please have <strong>₱${total.toLocaleString()}</strong> ready when your order arrives. No upfront payment required.</p>`
+      )}
     `),
   })
 }
