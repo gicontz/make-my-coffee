@@ -187,6 +187,9 @@ export async function sendOrderEmails(data: OrderEmailData) {
   await transporter.sendMail({
     from: `"Make My Coffee" <${process.env.GMAIL_USER}>`,
     to: customer.email,
+    // BCC staff on the customer confirmation too — silent to the customer,
+    // so we and staff get a copy of every email we send.
+    ...(staffBcc.length ? { bcc: staffBcc } : {}),
     subject: `Order Confirmed #${orderId} — Make My Coffee`,
     html: base(`
       <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">Thank you, ${customer.firstName}!</h2>
