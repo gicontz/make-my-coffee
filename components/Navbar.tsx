@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { useState } from 'react'
+import wordmark from '@/app/assets/logo-wordmark.png'
 
 export default function Navbar() {
   const { itemCount } = useCart()
@@ -13,23 +15,14 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-espresso-400 flex items-center justify-center shadow-md flex-shrink-0">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1C0A00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 8H19a2 2 0 012 2v2a2 2 0 01-2 2h-2"/>
-                <path d="M3 8h14v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
-                <path d="M7 8V6a1 1 0 011-1h8a1 1 0 011 1v2"/>
-              </svg>
-            </div>
-            <div className="leading-none">
-              <span className="text-espresso-50 font-bold text-base block" style={{ fontFamily: 'Georgia, serif' }}>
-                Make My Coffee
-              </span>
-              <span className="text-espresso-400 text-[10px] tracking-widest uppercase">
-                Espresso Shots
-              </span>
-            </div>
+          {/* Logo — the wordmark reversed to cream for the dark espresso bar */}
+          <Link href="/" className="flex items-center" aria-label="Make My Coffee — home">
+            <Image
+              src={wordmark}
+              alt="Make My Coffee"
+              priority
+              className="h-7 w-auto brightness-0 invert"
+            />
           </Link>
 
           {/* Desktop nav */}
