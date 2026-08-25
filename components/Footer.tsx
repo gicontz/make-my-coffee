@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import Image from 'next/image'
+import wordmark from '@/app/assets/logo-wordmark.png'
 
 export default function Footer() {
   return (
@@ -6,9 +8,11 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <div>
-            <h3 className="text-espresso-50 font-bold text-lg mb-3" style={{ fontFamily: 'Georgia, serif' }}>
-              Make My Coffee
-            </h3>
+            <Image
+              src={wordmark}
+              alt="Make My Coffee"
+              className="h-9 w-auto brightness-0 invert mb-4"
+            />
             <p className="text-espresso-400 text-sm leading-relaxed">
               Pure espresso shots crafted for those who love their coffee their own way. A signature blend from Cambodia &amp; Indonesia.
             </p>

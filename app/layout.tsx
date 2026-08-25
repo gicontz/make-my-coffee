@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Inter } from 'next/font/google'
+import { Playfair_Display, Work_Sans } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -11,9 +11,9 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
-const inter = Inter({
+const workSans = Work_Sans({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-work-sans',
   display: 'swap',
 })
 
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
-      <body className="bg-espresso-50 text-espresso-900 antialiased" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
+    <html lang="en" className={`${playfair.variable} ${workSans.variable}`}>
+      <body className="bg-espresso-50 text-espresso-900 antialiased" style={{ fontFamily: 'var(--font-work-sans), system-ui, sans-serif' }}>
         <CartProvider>
           <Navbar />
           <main className="pt-16">{children}</main>

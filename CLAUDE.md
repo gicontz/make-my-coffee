@@ -8,7 +8,7 @@ An ecommerce website selling bottled espresso shots (30ml per shot) in 4, 7, and
 - **Styling**: Tailwind CSS with a custom `espresso` color palette
 - **Language**: TypeScript
 - **State**: React Context API (CartContext) + localStorage persistence
-- **Fonts**: Playfair Display (headings) + Inter (body) via `next/font/google`
+- **Fonts**: Playfair Display (headings) + Work Sans (body) via `next/font/google`
 
 ## Running the project
 ```bash

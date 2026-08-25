@@ -12,7 +12,7 @@ const config: Config = {
     extend: {
       colors: {
         espresso: {
-          50:  '#FAF6F1',
+          50:  '#FBF8F5',
           100: '#F5E6D3',
           200: '#E8C9A0',
           300: '#D4A96A',
