@@ -11,7 +11,7 @@ colors:
   honey: "#D4A96A"
   sand: "#E8C9A0"
   cream: "#F5E6D3"
-  porcelain: "#FAF6F1"
+  porcelain: "#FBF8F5"
   success: "#16A34A"
   danger: "#B91C1C"
 typography:
@@ -34,13 +34,13 @@ typography:
     lineHeight: 1.25
     letterSpacing: "normal"
   body:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "Work Sans, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.625
     letterSpacing: "normal"
   label:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "Work Sans, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 600
     lineHeight: 1.4
@@ -111,7 +111,7 @@ This system explicitly rejects the **loud discount / sari-sari look** (neon, sta
 
 **Key Characteristics:**
 - Dark espresso atmosphere; cream working surfaces; gold as a scarce accent.
-- Playfair Display serif for every heading; Inter for everything else.
+- Playfair Display serif for every heading; Work Sans for everything else.
 - Mobile-first and thumb-first: the core customer is on a phone, paying cash on delivery.
 - Crisp and refined over soft and decorative; restraint is the premium signal.
 - WCAG 2.1 AA contrast is a hard floor, not a nice-to-have.
@@ -146,19 +146,19 @@ A roasted-coffee ramp from near-black bean to pale cream, lit by a single carame
 ## 3. Typography
 
 **Display Font:** Playfair Display (with Georgia, serif fallback)
-**Body Font:** Inter (with system-ui, sans-serif fallback)
+**Body Font:** Work Sans (with system-ui, sans-serif fallback)
 
-**Character:** A high-contrast serif (Playfair) paired with a neutral humanist sans (Inter) on a clean contrast axis: every heading is the serif, everything else is Inter. The serif carries the warmth and craft; Inter keeps prices, forms, and labels legible and modern. Two families only; do not introduce a third.
+**Character:** A high-contrast serif (Playfair) paired with a neutral humanist sans (Work Sans) on a clean contrast axis: every heading is the serif, everything else is Work Sans. The serif carries the warmth and craft; Work Sans keeps prices, forms, and labels legible and modern. Two families only; do not introduce a third.
 
 ### Hierarchy
 - **Display** (Playfair, 700, `clamp(3rem, 6vw, 4.5rem)`, line-height 1.08): Hero headline only. One per page. Max ceiling ~4.5rem; do not exceed.
 - **Headline** (Playfair, 700, `clamp(1.75rem, 4vw, 2.25rem)`, line-height 1.15): Section titles ("Choose Your Bottle", "Place Your Order").
 - **Title** (Playfair, 700, 1.25rem, line-height 1.25): Card and product names, modal titles, form-section headings.
-- **Body** (Inter, 400, 1rem, line-height 1.625): Paragraph copy. Cap measure at 65–75ch. For emphasized lead paragraphs, step weight or size, not color.
-- **Label** (Inter, 600, 0.75rem, letter-spacing 0.08em, uppercase): Field labels, status pills, the brand tagline ("Espresso Shots"). Reserve uppercase for labels of ≤4 words.
+- **Body** (Work Sans, 400, 1rem, line-height 1.625): Paragraph copy. Cap measure at 65–75ch. For emphasized lead paragraphs, step weight or size, not color.
+- **Label** (Work Sans, 600, 0.75rem, letter-spacing 0.08em, uppercase): Field labels, status pills, the brand tagline ("Espresso Shots"). Reserve uppercase for labels of ≤4 words.
 
 ### Named Rules
-**The Serif-Headings Rule.** Every heading is Playfair Display, applied inline as `style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}` (Tailwind `font-serif` is intentionally not configured). Body and UI text is always Inter. There is no third typeface.
+**The Serif-Headings Rule.** Every heading is Playfair Display, applied inline as `style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}` (Tailwind `font-serif` is intentionally not configured). Body and UI text is always Work Sans. There is no third typeface.
 
 **The Sparing-Eyebrow Rule.** The small uppercase tracked label is a real part of the system, but it is **not** an automatic eyebrow above every section. Today the storefront repeats it ("The Blend Story", "Simple Process", "Get Creative") on nearly every section; that reads as AI scaffolding and works against the premium brief. Use the label for genuine labels (field names, status, the brand tagline), not as a reflexive section kicker.
 
@@ -198,13 +198,13 @@ The intended feel is **crisp and refined**. The current build leans soft (pill b
 - **Internal Padding:** 24–32px (`p-6` to `p-8`).
 
 ### Inputs / Fields
-- **Style:** White fill, 1px `sand` (`#E8C9A0`) border, `sm` radius (12px, `rounded-xl`), padding `12px 16px`, Inter at 0.875rem. Labels are the uppercase Label style above the field.
+- **Style:** White fill, 1px `sand` (`#E8C9A0`) border, `sm` radius (12px, `rounded-xl`), padding `12px 16px`, Work Sans at 0.875rem. Labels are the uppercase Label style above the field.
 - **Focus:** Border shifts to `caramel-gold` (`#C8860A`) plus a soft 2px gold ring at 20% opacity (`focus:ring-espresso-400/20`). No glow beyond the ring.
 - **Placeholder:** Currently `honey` (`espresso-300`), which fails AA on white. **Darken placeholder text to at least `amber`/`cacao`** so it meets 4.5:1.
 - **Error:** `danger` text on a `red-50` panel with a `red-200` border.
 
 ### Navigation
-- **Storefront:** Fixed top bar, `espresso-noir` at 95% with backdrop blur and an `espresso-bean` bottom border. Links are `espresso-200` → hover `espresso-300`, Inter 0.875rem medium. Cart icon carries a gold count bubble. Mobile collapses to a hamburger panel.
+- **Storefront:** Fixed top bar, `espresso-noir` at 95% with backdrop blur and an `espresso-bean` bottom border. Links are `espresso-200` → hover `espresso-300`, Work Sans 0.875rem medium. Cart icon carries a gold count bubble. Mobile collapses to a hamburger panel.
 - **Admin:** Fixed left sidebar (224px), solid `espresso-noir`. Active item = `espresso-bean` fill with `porcelain` text and a gold icon; inactive = muted with a hover tint. Logout sits pinned at the bottom.
 
 ### Signature Component: Hero Bottle Labels
@@ -215,7 +215,7 @@ Interactive labels pinned over the hero bottle image, each anchored to a bottle 
 ### Do:
 - **Do** keep Caramel Gold (`#C8860A`) scarce: CTAs, the brand mark, badges, and large display highlights only (The One Spark Rule).
 - **Do** use gold for text only on dark espresso surfaces; on light, use Cacao (`#5C3317`) or darker for small text (The Gold-on-Dark Rule).
-- **Do** set every heading in Playfair Display and everything else in Inter; never add a third typeface (The Serif-Headings Rule).
+- **Do** set every heading in Playfair Display and everything else in Work Sans; never add a third typeface (The Serif-Headings Rule).
 - **Do** define light-surface cards and fields by a hairline `sand`/`cream` border first, with `shadow-sm` for a hint of lift (The Border-First Rule).
 - **Do** hold body text and placeholders to WCAG AA (≥4.5:1); darken the current `espresso-300` placeholder.
 - **Do** design mobile-first with ≥44px tap targets and a `prefers-reduced-motion` fallback for every animation.
