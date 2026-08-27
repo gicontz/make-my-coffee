@@ -156,7 +156,7 @@ export default function AdminOrders() {
                       {pStatus?.label}
                     </span>
                     <span className="text-espresso-400 text-xs">
-                      {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' })}
                     </span>
                   </div>
                 </div>

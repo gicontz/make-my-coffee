@@ -7,13 +7,24 @@ import { sql } from '@/lib/db'
 // every time, which is why the dashboard always showed "—". Querying the DB
 // directly removes the whole class of bug: no URL to get wrong, no extra
 // network hop, works identically in dev and prod.
+// The business (customers, delivery, staff) is entirely Manila-local, so
+// "today" and "this week" must mean Manila's calendar day/week — not the
+// database session's timezone (UTC on Neon). Without this, CURRENT_DATE /
+// NOW() evaluate in UTC, and Today's Orders silently undercounts for the
+// first 8 hours of every Manila day (Manila is UTC+8) since an order placed
+// at 1am Manila time still reads as "yesterday" in UTC until 8am. The
+// `date_trunc('day', NOW() AT TIME ZONE tz) AT TIME ZONE tz` idiom converts
+// "now" to Manila wall-clock, truncates to Manila midnight, then converts
+// that back to a real instant (timestamptz) to compare created_at against.
+const TZ = 'Asia/Manila'
+
 export async function getDashboardStats() {
   const [todayStats] = await sql`
     SELECT
       COUNT(*)::int                                      AS orders,
       COALESCE(SUM(total), 0)::int                       AS revenue
     FROM orders
-    WHERE created_at >= CURRENT_DATE
+    WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ}
   `
 
   const [weekStats] = await sql`
@@ -21,7 +32,7 @@ export async function getDashboardStats() {
       COUNT(*)::int                                      AS orders,
       COALESCE(SUM(total), 0)::int                       AS revenue
     FROM orders
-    WHERE created_at >= date_trunc('week', NOW())
+    WHERE created_at >= date_trunc('week', NOW() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ}
   `
 
   const [allStats] = await sql`
@@ -51,11 +62,11 @@ export async function getDashboardStats() {
       COALESCE(COUNT(o.id), 0)::int                      AS orders,
       COALESCE(SUM(o.total), 0)::int                     AS revenue
     FROM generate_series(
-      CURRENT_DATE - INTERVAL '6 days',
-      CURRENT_DATE,
+      (NOW() AT TIME ZONE ${TZ})::date - INTERVAL '6 days',
+      (NOW() AT TIME ZONE ${TZ})::date,
       INTERVAL '1 day'
     ) AS d(day)
-    LEFT JOIN orders o ON DATE(o.created_at) = d.day
+    LEFT JOIN orders o ON (o.created_at AT TIME ZONE ${TZ})::date = d.day
     GROUP BY d.day
     ORDER BY d.day ASC
   `) as { date: string; orders: number; revenue: number }[]

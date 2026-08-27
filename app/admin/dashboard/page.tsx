@@ -124,7 +124,7 @@ export default async function Dashboard() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-espresso-400 text-xs">
-                      {new Date(o.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(o.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' })}
                     </td>
                   </tr>
                 ))}
