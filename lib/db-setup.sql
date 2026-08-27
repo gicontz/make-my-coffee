@@ -18,9 +18,13 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_method TEXT NOT NULL DEFAULT 'cod',
   payment_status TEXT NOT NULL DEFAULT 'unpaid',
   order_status   TEXT NOT NULL DEFAULT 'pending',
+  delivery_slots TEXT[] NOT NULL DEFAULT '{}',
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Applied to the live DB via lib/migrations/0001_add_delivery_slots.sql;
+-- included here too so a fresh setup doesn't need the migration separately.
 
 CREATE INDEX IF NOT EXISTS orders_order_status_idx  ON orders (order_status);
 CREATE INDEX IF NOT EXISTS orders_created_at_idx    ON orders (created_at DESC);

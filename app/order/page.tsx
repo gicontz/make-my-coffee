@@ -6,6 +6,7 @@ import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
 import { calcShipping } from '@/lib/shipping'
+import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
 
 type Form = {
   firstName: string
@@ -30,6 +31,7 @@ const inputCls =
 export default function OrderPage() {
   const { items, total, clearCart } = useCart()
   const [form, setForm] = useState<Form>(INITIAL_FORM)
+  const [deliverySlots, setDeliverySlots] = useState<string[]>([])
   const [orderId, setOrderId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -45,10 +47,29 @@ export default function OrderPage() {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
+  function toggleSlot(id: string) {
+    setDeliverySlots(prev => (prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]))
+  }
+
+  const allSlotsSelected = deliverySlots.length === DELIVERY_SLOT_IDS.length
+  function toggleAllDay() {
+    setDeliverySlots(allSlotsSelected ? [] : [...DELIVERY_SLOT_IDS])
+  }
+
+  const hasMorningSlot = deliverySlots.some(id => slotsInPeriod('morning').some(s => s.id === id))
+  const hasAfternoonSlot = deliverySlots.some(id => slotsInPeriod('afternoon').some(s => s.id === id))
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+
+    const slotError = validateDeliverySlots(deliverySlots)
+    if (slotError) {
+      setError(slotError)
+      return
+    }
+
+    setLoading(true)
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -63,6 +84,7 @@ export default function OrderPage() {
             quantity: i.quantity,
           })),
           subtotal: total,
+          deliverySlots,
         }),
       })
       const data = await res.json()
@@ -94,6 +116,13 @@ export default function OrderPage() {
           <p className="text-espresso-600 mb-2">
             A confirmation has been sent to <span className="font-semibold">{form.email}</span>.
           </p>
+          {deliverySlots.length > 0 && (
+            <p className="text-espresso-500 text-sm mb-2">
+              Delivery window: <span className="font-semibold text-espresso-700">
+                {[...deliverySlots].sort().map(slotLabel).join(', ')}
+              </span>
+            </p>
+          )}
           <p className="text-espresso-400 text-sm mb-8">
             Payment is <strong>Cash on Delivery</strong>. Please have ₱{orderTotal.toLocaleString()} ready when your order arrives.
           </p>
@@ -201,10 +230,67 @@ export default function OrderPage() {
                 </div>
               </div>
 
+              {/* Delivery Time */}
+              <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <h2 className="text-espresso-900 font-bold text-xl flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
+                    <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
+                    Delivery Time
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={toggleAllDay}
+                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                      allSlotsSelected
+                        ? 'bg-espresso-900 text-espresso-50 hover:bg-espresso-700'
+                        : 'bg-espresso-100 text-espresso-700 hover:bg-espresso-200'
+                    }`}
+                  >
+                    {allSlotsSelected ? 'Clear All' : 'All Day'}
+                  </button>
+                </div>
+                <p className="text-espresso-500 text-sm mb-5">
+                  We deliver between 9:00 AM and 7:00 PM. Choose at least one morning and one afternoon–evening time — pick more if you're flexible.
+                </p>
+
+                {(['morning', 'afternoon'] as SlotPeriod[]).map(period => (
+                  <div key={period} className="mb-5 last:mb-0">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <p className="text-espresso-700 text-xs font-semibold uppercase tracking-wider">{PERIOD_LABEL[period]}</p>
+                      {(period === 'morning' ? hasMorningSlot : hasAfternoonSlot) && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {slotsInPeriod(period).map(slot => {
+                        const selected = deliverySlots.includes(slot.id)
+                        return (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => toggleSlot(slot.id)}
+                            aria-pressed={selected}
+                            className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-colors ${
+                              selected
+                                ? 'bg-espresso-900 border-espresso-900 text-espresso-50'
+                                : 'bg-white border-espresso-200 text-espresso-700 hover:border-espresso-400'
+                            }`}
+                          >
+                            {slot.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               {/* COD */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
                 <h2 className="text-espresso-900 font-bold text-xl mb-5 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
-                  <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
+                  <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">4</span>
                   Payment
                 </h2>
                 <div className="flex items-start gap-4 bg-espresso-50 border border-espresso-200 rounded-2xl p-5">
