@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { slotLabel } from '@/lib/deliverySlots'
 
 interface Order {
   id: number
@@ -18,6 +19,7 @@ interface Order {
   order_status: string
   payment_status: string
   notes: string
+  delivery_slots: string[]
   created_at: string
 }
 
@@ -195,6 +197,19 @@ export default function AdminOrders() {
                       <p className="text-espresso-500">{order.address}</p>
                       {order.notes && <p className="text-espresso-400 italic">"{order.notes}"</p>}
                     </div>
+
+                    {order.delivery_slots?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-espresso-100">
+                        <p className="text-xs font-semibold text-espresso-500 uppercase tracking-wider mb-2">Delivery Time</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[...order.delivery_slots].sort().map(id => (
+                            <span key={id} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-espresso-50 border border-espresso-200 text-espresso-700">
+                              {slotLabel(id)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

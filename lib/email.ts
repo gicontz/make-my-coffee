@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { slotLabel } from '@/lib/deliverySlots'
 
 interface OrderItem {
   id: string
@@ -25,6 +26,7 @@ export interface OrderEmailData {
   subtotal: number
   shipping: number
   total: number
+  deliverySlots?: string[]
 }
 
 // Web-safe stack — Outlook ignores `system-ui` and falls back to Times.
@@ -144,8 +146,11 @@ function base(content: string): string {
 
 export async function sendOrderEmails(data: OrderEmailData) {
   const transporter = createTransport()
-  const { orderId, customer, items, subtotal, shipping, total } = data
+  const { orderId, customer, items, subtotal, shipping, total, deliverySlots } = data
   const customerName = `${customer.firstName} ${customer.lastName}`
+  const deliveryWindow = deliverySlots?.length
+    ? [...deliverySlots].sort().map(slotLabel).join(', ')
+    : null
 
   // Staff to BCC on the admin notification (comma-separated env)
   const staffBcc = (process.env.BCC_EMAIL ?? '')
@@ -172,6 +177,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
         ${detailRow('Phone', customer.phone)}
         ${detailRow('Address', customer.address)}
         ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
+        ${deliveryWindow ? detailRow('Delivery Time', deliveryWindow) : ''}
         ${customer.notes ? detailRow('Notes', customer.notes) : ''}
       </table>
 
@@ -205,6 +211,13 @@ export async function sendOrderEmails(data: OrderEmailData) {
         `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
          <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${customer.address}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>`
       )}
+
+      ${deliveryWindow ? infoBox(
+        '#FAF6F1',
+        '#F0E2D0',
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery Time</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
+      ) : ''}
 
       ${infoBox(
         '#FFF8F0',
