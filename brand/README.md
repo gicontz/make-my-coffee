@@ -2,7 +2,18 @@
 
 Marketing and identity assets for Make My Coffee, built from the design system
 in [`../DESIGN.md`](../DESIGN.md) (Playfair Display + Work Sans, the espresso /
-caramel-gold palette, the wordmark and bean marks in [`../app/assets`](../app/assets)).
+caramel-gold palette, the wordmark in [`../app/assets`](../app/assets)).
+
+## Logo & icon
+
+- **Primary logo:** the `logo-wordmark*` script wordmark ("make my COFFEE").
+- **App icon:** the hand-and-cup mark, derived from `new-logo.png`, cleaned into
+  - `../app/assets/logo-icon.png` — cream mark on transparent (for dark surfaces)
+  - `../app/assets/logo-icon-badge.png` — mark in an espresso roundel (for light surfaces)
+  - `../app/icon.png` — the site favicon (the badge)
+
+  The icon is used for the favicon, the social avatar, and as a small accent on
+  the assets below. `new-logo.png` is the original raster source.
 
 | File | Size (px) | Use |
 |------|-----------|-----|
