@@ -1,28 +1,38 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
-import { calcShipping } from '@/lib/shipping'
+import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
+import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
+import type { LatLng, SuggestionPrecision } from '@/components/DeliveryMapPicker'
+
+// Leaflet needs `window` — load client-only, no SSR.
+const DeliveryMapPicker = dynamic(() => import('@/components/DeliveryMapPicker'), {
+  ssr: false,
+  loading: () => <div className="h-64 rounded-xl border border-espresso-200 bg-espresso-50 animate-pulse" />,
+})
 
 type Form = {
   firstName: string
   lastName: string
   email: string
   phone: string
-  address: string
-  city: string
   province: string
+  city: string
+  barangay: string
+  address: string
   postalCode: string
   notes: string
 }
 
 const INITIAL_FORM: Form = {
   firstName: '', lastName: '', email: '', phone: '',
-  address: '', city: '', province: '', postalCode: '', notes: '',
+  province: '', city: '', barangay: '', address: '', postalCode: '', notes: '',
 }
 
 const inputCls =
@@ -36,15 +46,113 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const shipping = calcShipping(form.city, total)
+  // Map pin — the reliable source for the dropoff point (see
+  // components/DeliveryMapPicker.tsx). geocodeSuggestion pre-fills it as the
+  // customer fills in the structured address fields below.
+  const [pin, setPin] = useState<LatLng | null>(null)
+  const [geocodeSuggestion, setGeocodeSuggestion] = useState<LatLng | null>(null)
+  const [geocodePrecision, setGeocodePrecision] = useState<SuggestionPrecision | null>(null)
+
+  // Live delivery-fee quote. Starts at the flat rate; once province+city are
+  // set, a debounced call to /api/shipping/quote asks Lalamove to price the
+  // actual distance (using the pin once one exists). Never authoritative —
+  // POST /api/orders recomputes the real fee server-side regardless of this.
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null)
+  const [quoting, setQuoting] = useState(false)
+  const shipping = shippingQuote?.fee ?? FLAT_SHIPPING_FEE
   const orderTotal = total + shipping
 
   // guard: don't run on server
   const [hydrated, setHydrated] = useState(false)
   useEffect(() => setHydrated(true), [])
 
+  // Pre-fills the map pin from the structured address as the customer types
+  // — a starting guess only; DeliveryMapPicker stops applying these once the
+  // customer drags/taps the map themselves.
+  useEffect(() => {
+    if (!form.city || !form.province) {
+      setGeocodeSuggestion(null)
+      setGeocodePrecision(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/geocode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: form.address, barangay: form.barangay, city: form.city, province: form.province, postalCode: form.postalCode,
+          }),
+        })
+        const data = await res.json()
+        setGeocodeSuggestion(res.ok ? data.coords : null)
+        setGeocodePrecision(res.ok ? data.precision : null)
+      } catch {
+        setGeocodeSuggestion(null)
+        setGeocodePrecision(null)
+      }
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [form.address, form.barangay, form.city, form.province, form.postalCode])
+
+  useEffect(() => {
+    if (!form.city || !form.province) {
+      setShippingQuote(null)
+      return
+    }
+    setQuoting(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/shipping/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: form.address, barangay: form.barangay, city: form.city, province: form.province, postalCode: form.postalCode,
+            lat: pin?.lat, lng: pin?.lng,
+            subtotal: total,
+          }),
+        })
+        setShippingQuote(res.ok ? await res.json() : null)
+      } catch {
+        setShippingQuote(null)
+      } finally {
+        setQuoting(false)
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [form.address, form.barangay, form.city, form.province, form.postalCode, pin?.lat, pin?.lng, total])
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  // Tracks the last postal code we auto-filled, so a later city change can
+  // tell "customer typed their own zip" apart from "still showing our guess"
+  // and only overwrite the latter.
+  const lastAutoZip = useRef('')
+
+  function handleProvinceChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const province = e.target.value
+    lastAutoZip.current = ''
+    // A different province means any existing pin no longer applies — clear
+    // it so the map re-suggests fresh instead of silently keeping a pin from
+    // the old location (see the `key` on DeliveryMapPicker below, which also
+    // resets its "customer moved this manually" lock for the same reason).
+    setPin(null)
+    setForm(prev => ({ ...prev, province, city: '', postalCode: '' }))
+  }
+
+  function handleCityChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const city = e.target.value
+    setPin(null)
+    setForm(prev => {
+      const zip = zipFor(prev.province, city)
+      // Only auto-fill/replace the postal code if the customer hasn't typed
+      // their own — never clobber a manual edit.
+      const shouldAutoFill = !!zip && (prev.postalCode === '' || prev.postalCode === lastAutoZip.current)
+      if (shouldAutoFill) lastAutoZip.current = zip!
+      return { ...prev, city, postalCode: shouldAutoFill ? zip! : prev.postalCode }
+    })
   }
 
   function toggleSlot(id: string) {
@@ -75,7 +183,7 @@ export default function OrderPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer: form,
+          customer: { ...form, lat: pin?.lat, lng: pin?.lng },
           items: items.map(i => ({
             id: i.product.id,
             name: i.product.name,
@@ -198,31 +306,63 @@ export default function OrderPage() {
                   Delivery Address
                 </h2>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Street Address *</label>
-                    <input type="text" name="address" value={form.address} onChange={handleChange} required className={inputCls} placeholder="123 Rizal Street, Brgy. San Antonio" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">City *</label>
-                      <input type="text" name="city" value={form.city} onChange={handleChange} required className={inputCls} placeholder="Pasig" />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Province *</label>
-                      <input type="text" name="province" value={form.province} onChange={handleChange} required className={inputCls} placeholder="Metro Manila" />
+                      <select name="province" value={form.province} onChange={handleProvinceChange} required className={inputCls}>
+                        <option value="">Select province</option>
+                        {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">City / Municipality *</label>
+                      <select
+                        name="city"
+                        value={form.city}
+                        onChange={handleCityChange}
+                        required
+                        disabled={!form.province}
+                        className={`${inputCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <option value="">{form.province ? 'Select city / municipality' : 'Select province first'}</option>
+                        {citiesFor(form.province).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Barangay *</label>
+                      <input type="text" name="barangay" value={form.barangay} onChange={handleChange} required className={inputCls} placeholder="San Antonio" />
                     </div>
                     <div>
                       <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Postal Code *</label>
                       <input type="text" name="postalCode" value={form.postalCode} onChange={handleChange} required className={inputCls} placeholder="1600" />
+                      {zipMayVaryByArea(form.province) && form.city && (
+                        <p className="text-espresso-400 text-[11px] mt-1">Default for {form.city} — adjust if your barangay uses a different code.</p>
+                      )}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">House No. / Street / Subdivision *</label>
+                    <input type="text" name="address" value={form.address} onChange={handleChange} required className={inputCls} placeholder="Blk 17 Lt 7 Zone 1, Rizal Street" />
+                  </div>
                   {/* Free shipping nudge */}
-                  {form.city && calcShipping(form.city, total) === 0 && (
+                  {form.city && isFreeShippingEligible(form.city, total) && (
                     <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-green-700 text-sm flex items-center gap-2">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
                       Free delivery to Pasig City on orders ₱1,000+!
                     </div>
                   )}
+                  <div>
+                    <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Pin Your Exact Location</label>
+                    <DeliveryMapPicker
+                      key={`${form.province}|${form.city}`}
+                      value={pin}
+                      onChange={setPin}
+                      suggestedCenter={geocodeSuggestion}
+                      suggestedPrecision={geocodePrecision}
+                    />
+                  </div>
                   <div>
                     <label className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">Notes (optional)</label>
                     <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className={`${inputCls} resize-none`} placeholder="Any special instructions…" />
@@ -344,11 +484,18 @@ export default function OrderPage() {
                     <span className="text-espresso-500">Subtotal</span>
                     <span className="text-espresso-900 font-medium">₱{total.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-espresso-500">Shipping</span>
-                    <span className={shipping === 0 ? 'text-green-600 font-semibold' : 'text-espresso-900 font-medium'}>
-                      {shipping === 0 ? 'Free' : `₱${shipping}`}
-                    </span>
+                  <div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-espresso-500">Shipping</span>
+                      <span className={shipping === 0 ? 'text-green-600 font-semibold' : 'text-espresso-900 font-medium'}>
+                        {quoting ? 'Calculating…' : shipping === 0 ? 'Free' : `₱${shipping}`}
+                      </span>
+                    </div>
+                    {!quoting && shippingQuote?.source === 'lalamove' && (
+                      <p className="text-espresso-400 text-xs text-right mt-0.5">
+                        Live rider pricing{shippingQuote.distanceKm != null ? ` · ${shippingQuote.distanceKm.toFixed(1)} km` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -361,7 +508,7 @@ export default function OrderPage() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || quoting}
                   className="w-full flex items-center justify-center gap-2 bg-espresso-900 hover:bg-espresso-700 disabled:opacity-60 text-espresso-50 font-bold py-4 rounded-full transition-colors shadow-lg text-base"
                 >
                   {loading ? (
@@ -370,6 +517,13 @@ export default function OrderPage() {
                         <path d="M21 12a9 9 0 11-6.219-8.56"/>
                       </svg>
                       Placing Order…
+                    </>
+                  ) : quoting ? (
+                    <>
+                      <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                      </svg>
+                      Calculating Delivery Fee…
                     </>
                   ) : (
                     <>
