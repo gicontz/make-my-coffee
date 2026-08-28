@@ -17,6 +17,7 @@ export interface OrderEmailData {
     email: string
     phone: string
     address: string
+    barangay?: string
     city: string
     province: string
     postalCode: string
@@ -176,6 +177,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
         ${detailRow('Email', customer.email)}
         ${detailRow('Phone', customer.phone)}
         ${detailRow('Address', customer.address)}
+        ${customer.barangay ? detailRow('Barangay', customer.barangay) : ''}
         ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
         ${deliveryWindow ? detailRow('Delivery Time', deliveryWindow) : ''}
         ${customer.notes ? detailRow('Notes', customer.notes) : ''}
@@ -209,7 +211,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
         '#FAF6F1',
         '#F0E2D0',
         `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
-         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${customer.address}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>`
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${customer.address}${customer.barangay ? `, Brgy. ${customer.barangay}` : ''}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>`
       )}
 
       ${deliveryWindow ? infoBox(

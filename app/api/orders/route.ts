@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { sendOrderEmails } from '@/lib/email'
-import { calcShipping } from '@/lib/shipping'
+import { getShippingFee } from '@/lib/shippingQuote'
 import { validateDeliverySlots } from '@/lib/deliverySlots'
 
 export async function POST(request: NextRequest) {
@@ -20,22 +20,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: slotError }, { status: 400 })
     }
 
-    const shipping = calcShipping(customer.city ?? '', subtotal)
+    // Authoritative shipping price — recomputed here regardless of anything
+    // the client showed at checkout (same discipline as the rest of this
+    // route: never trust client-supplied totals).
+    const shippingQuote = await getShippingFee(
+      {
+        address: customer.address ?? '', barangay: customer.barangay || undefined,
+        city: customer.city ?? '', province: customer.province ?? '', postalCode: customer.postalCode ?? '',
+        lat: customer.lat, lng: customer.lng,
+      },
+      subtotal
+    )
+    const shipping = shippingQuote.fee
     const total = subtotal + shipping
 
     const rows = await sql`
       INSERT INTO orders (
         first_name, last_name, email, phone,
-        address, city, province, postal_code, notes,
+        address, barangay, city, province, postal_code, notes,
         items, subtotal, shipping, total,
         payment_method, payment_status, order_status,
-        delivery_slots
+        delivery_slots, shipping_source, shipping_distance_km,
+        delivery_lat, delivery_lng
       ) VALUES (
         ${customer.firstName}, ${customer.lastName}, ${customer.email}, ${customer.phone ?? ''},
-        ${customer.address ?? ''}, ${customer.city ?? ''}, ${customer.province ?? ''}, ${customer.postalCode ?? ''}, ${customer.notes ?? ''},
+        ${customer.address ?? ''}, ${customer.barangay ?? ''}, ${customer.city ?? ''}, ${customer.province ?? ''}, ${customer.postalCode ?? ''}, ${customer.notes ?? ''},
         ${JSON.stringify(items)}, ${subtotal}, ${shipping}, ${total},
         'cod', 'unpaid', 'pending',
-        ${deliverySlots}
+        ${deliverySlots}, ${shippingQuote.source}, ${shippingQuote.distanceKm},
+        ${customer.lat ?? null}, ${customer.lng ?? null}
       )
       RETURNING id
     `

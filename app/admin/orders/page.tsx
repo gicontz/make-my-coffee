@@ -11,10 +11,16 @@ interface Order {
   phone: string
   city: string
   province: string
+  barangay: string
   address: string
+  postal_code: string
+  delivery_lat: string | null
+  delivery_lng: string | null
   items: { name: string; shots: number; price: number; quantity: number }[]
   subtotal: number
   shipping: number
+  shipping_source: string
+  shipping_distance_km: string | null
   total: number
   order_status: string
   payment_status: string
@@ -179,7 +185,14 @@ export default function AdminOrders() {
                         <span>Subtotal</span><span>₱{order.subtotal.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm text-espresso-500">
-                        <span>Shipping</span>
+                        <span>
+                          Shipping
+                          {order.shipping_source === 'lalamove' && (
+                            <span className="ml-1.5 inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-espresso-100 text-espresso-700 align-middle">
+                              Lalamove{order.shipping_distance_km ? ` · ${Number(order.shipping_distance_km).toFixed(1)}km` : ''}
+                            </span>
+                          )}
+                        </span>
                         <span>{order.shipping === 0 ? 'Free' : `₱${order.shipping}`}</span>
                       </div>
                       <div className="flex justify-between font-bold text-espresso-900">
@@ -194,7 +207,19 @@ export default function AdminOrders() {
                     <div className="space-y-1 text-sm text-espresso-700">
                       <p>{order.email}</p>
                       <p>{order.phone}</p>
-                      <p className="text-espresso-500">{order.address}</p>
+                      <p className="text-espresso-500">
+                        {order.address}{order.barangay ? `, Brgy. ${order.barangay}` : ''}, {order.city}, {order.province} {order.postal_code}
+                      </p>
+                      {order.delivery_lat && order.delivery_lng && (
+                        <a
+                          href={`https://www.google.com/maps?q=${order.delivery_lat},${order.delivery_lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-espresso-400 hover:text-espresso-700 text-xs underline underline-offset-2"
+                        >
+                          View pinned location ↗
+                        </a>
+                      )}
                       {order.notes && <p className="text-espresso-400 italic">"{order.notes}"</p>}
                     </div>
 

@@ -71,6 +71,113 @@ imports from there.
 **Implications:** Adding/changing a product is a one-file edit. Order rows snapshot
 item data into JSONB so past orders are unaffected by catalog edits.
 
+## D9 — Lalamove for shipping *pricing* only, not booking/dispatch
+**Decision:** Integrate Lalamove's v3 Quotation API to replace the flat ₱99 /
+free-Pasig-above-₱1000 rule with a real distance-based fee, wherever a live
+quote can be obtained. Do **not** call Lalamove's order/booking endpoints —
+riders are still arranged outside this app, same as before. User confirmed
+this scope explicitly (quotation only, not auto-dispatch) after being asked.
+**Why:** Removes the guesswork/subsidy risk of a flat rate (over/undercharging
+depending on actual distance) without taking on the cost and blast radius of
+auto-booking real couriers on every checkout.
+**Implications:**
+- `lib/lalamove.ts` — signed HMAC client + Nominatim (OpenStreetMap) geocoding
+  for the customer's typed address (free, no API key; fine at this volume).
+- `lib/shipping.ts` stays pure/client-safe (constants + free-shipping check
+  only) so the checkout page can still import it directly. The Lalamove-aware
+  orchestrator lives in **`lib/shippingQuote.ts`** instead, kept server-only
+  on purpose — it pulls in Node `crypto` and API secrets via `lib/lalamove.ts`,
+  none of which may reach a browser bundle.
+- `getShippingFee()` (`lib/shippingQuote.ts`) is the single source of truth:
+  free-Pasig promo first, then a live Lalamove quote, then the flat ₱99
+  fallback if Lalamove/geocoding is unavailable for any reason (no coverage,
+  network/API error, pickup env vars unset). Checkout never blocks on this.
+- `POST /api/shipping/quote` is a preview-only endpoint the checkout page
+  calls (debounced) to show a live number as the customer types their
+  address. Same as the rest of this app's discipline (D3): the client value
+  is never trusted — `POST /api/orders` recomputes the authoritative fee
+  itself via the same `getShippingFee()` at insert time.
+- New `orders` columns (`0002_add_shipping_source.sql`): `shipping_source`
+  (`'lalamove' | 'flat'`) and `shipping_distance_km`, so admin can see which
+  orders got a real distance-based price. Shown as a small badge in
+  `app/admin/orders/page.tsx`.
+- Pickup coordinates/address are env vars (`LALAMOVE_PICKUP_*`), not
+  hardcoded — must be set for live quotes to actually kick in; unset = same
+  flat-rate behavior as before this feature existed.
+- Sandbox keys only need to be in `.env.local`; sandbox quotations are free
+  (no wallet top-up required — that's only for booking, which this app
+  doesn't do). Production keys/base URL gated behind `LALAMOVE_ENV=production`.
+
+## D10 — Checkout map pin + restricted Province/City dropdowns, because free-text geocoding silently fails on PH addresses
+**Decision:** Add a Leaflet/OpenStreetMap pin picker to checkout
+(`components/DeliveryMapPicker.tsx`) and replace the free-text Province/City
+fields with dropdowns restricted to `lib/phLocations.ts`'s 6 provinces
+(Metro Manila/NCR, Rizal, Cavite, Laguna, Batangas, Bulacan) — Lalamove
+MOTORCYCLE's realistic coverage from the Pasig pickup point. Barangay stays
+free text (no reliable, complete barangay-level dataset exists to hardcode —
+PH has 40k+ barangays).
+**Why:** Confirmed live — "Blk 17 Lt 7 Zone 1 Bulihan, Silang, Cavite" (a real
+subdivision-style address a customer typed) could not be geocoded by
+Nominatim at all, so D9's flat-rate fallback silently kicked in and quoted
+₱99 for what a real pin priced at ₱288/60.7km. Free-text geocoding of PH
+subdivision addresses is not reliable enough to be the primary path — asking
+the customer to confirm a literal pin is.
+**Implications:**
+- The pin, once set, is what `lib/lalamove.ts`'s `getLalamoveQuote()` uses
+  directly for the dropoff — it skips geocoding entirely when
+  `dest.lat`/`dest.lng` are present. Free-text geocoding (`lib/geocoding.ts`,
+  extracted from the old inline copy in `lib/lalamove.ts`) is now only a
+  same-tier fallback for older/JS-disabled clients, and the *pre-fill*
+  mechanism for the map (`POST /api/geocode`) — never authoritative.
+- The map pin auto-applies a geocoded suggestion as the customer types
+  Province/City/Barangay/Address, but stops doing so the moment the customer
+  taps or drags the pin themselves (`manuallySet` ref in
+  `DeliveryMapPicker.tsx`) — never overwrites a deliberate correction.
+- The pre-fill guess itself is tiered (`geocodeWithFallback()` in
+  `lib/geocoding.ts`, called by `POST /api/geocode`): try the full address,
+  then just `Barangay X, City, Province`, then just `City, Province` —
+  stopping at whichever resolves. Verified live against the Silang/Cavite
+  case above: both the full address AND the barangay-level query failed to
+  resolve (Nominatim doesn't have "Bulihan" indexed distinctly), so it fell
+  through to city-level and centered on Silang correctly rather than leaving
+  the map at the generic Metro Manila default. `DeliveryMapPicker` shows
+  which tier it landed on — zooms in tighter for a closer match, and only
+  shows the green "pin set" confirmation once the customer has placed it
+  themselves or the full address resolved; barangay/city-level guesses get an
+  amber "we centered on your X — drag to your exact spot" prompt instead, so
+  the customer knows to actually check it.
+- Changing **Province or City** clears the pin (`setPin(null)` in
+  `handleProvinceChange`/`handleCityChange`) and remounts
+  `DeliveryMapPicker` via a `key={province|city}` — otherwise a manually-
+  placed pin from a previously-selected city would silently stick around
+  after the customer switches to a different one, pricing the quote against
+  the wrong location with no signal anything was stale. Barangay/street-
+  address edits do **not** reset the pin — those are refinements to an
+  already-placed pin, not a new location, and resetting on every keystroke
+  there would fight the "never override a manual placement" rule above.
+- Pin is **not required** to submit — if unset, `POST /api/orders` still
+  falls back through the D9 chain (text-geocode attempt → flat rate). Never
+  block checkout; this is an accuracy improvement, not a new gate.
+- ZIP code is auto-suggested from the selected City (`zipFor()` in
+  `lib/phLocations.ts`) but stays a plain editable text input — never
+  auto-filled again once the customer has typed their own (tracked via a
+  "was this still our last auto-fill" ref, not a blanket "field is dirty"
+  flag, so switching city twice doesn't get stuck). NCR is flagged
+  (`zipMayVaryByArea`) because Metro Manila cities genuinely have many ZIP
+  codes each (by barangay/district) — confirmed against this project's own
+  order data (Pasig/Manggahan is 1611, not the 1600 city default).
+- New `orders` columns (`0003_add_barangay_and_pin.sql`): `barangay`,
+  `delivery_lat`, `delivery_lng`. Admin (`app/admin/orders/page.tsx`) shows
+  barangay inline in the address and a "View pinned location" Google Maps
+  link when a pin exists. Customer emails (`lib/email.ts`) show barangay too.
+- Leaflet/react-leaflet chosen over Google Maps/Mapbox specifically because
+  no paid map API key exists in this project yet — free OSM tiles, no key,
+  consistent with the free-Nominatim-geocoding choice in D9. Loaded via
+  `next/dynamic({ ssr: false })` since Leaflet needs `window`; a custom SVG
+  divIcon is used for the pin instead of Leaflet's default marker (sidesteps
+  the well-known default-icon-path-under-webpack breakage, and matches brand
+  color instead of Leaflet's default blue).
+
 ---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.
@@ -78,3 +185,13 @@ item data into JSONB so past orders are unaffected by catalog edits.
 - No automated DB migrations; schema changes are manual SQL.
 - No inventory/stock tracking — orders can be placed regardless of stock.
 - No order-confirmation page persistence beyond the returned `orderId`.
+- Lalamove pickup location (`LALAMOVE_PICKUP_ADDRESS/LAT/LNG`) not yet set in
+  `.env.local` — until it is, every order still gets the flat ₱99/free-Pasig
+  rate (D9), silently, with a console warning.
+- Nominatim (free OSM geocoding) can fail to resolve loosely-formatted PH
+  addresses; when it does, that order also falls back to the flat rate rather
+  than blocking checkout. (D10's map pin is the fix for this — but only for
+  orders where the customer actually sets the pin.)
+- Barangay dropdowns don't exist (D10) — free text only, so typos/variant
+  spellings aren't caught. Not a correctness issue for pricing (the pin
+  decides that), just for the address text stored/emailed/shown to admin.

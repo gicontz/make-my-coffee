@@ -37,6 +37,8 @@ app/
     orders/page.tsx             Orders table, status controls
   api/
     orders/route.ts             POST — create order, insert, send emails
+    shipping/quote/route.ts     POST — checkout preview only, not authoritative
+    geocode/route.ts            POST — map-pin pre-fill guess only, not authoritative
     admin/
       login/route.ts            POST — credential check, set session cookie
       logout/route.ts           POST — clear session
@@ -46,6 +48,7 @@ app/
   assets/                       bottle.png, hero_splash.png, flavors/*.png
 components/
   Navbar.tsx, Footer.tsx, HeroSection.tsx
+  DeliveryMapPicker.tsx          Leaflet pin picker (dynamic-imported, ssr:false), see D10
   admin/Sidebar.tsx, admin/SalesChart.tsx
 context/CartContext.tsx         Cart provider + useCart hook
 lib/
@@ -53,7 +56,11 @@ lib/
   db.ts                         neon() sql client (throws if DATABASE_URL unset)
   db-setup.sql                  one-time orders table DDL (run in Neon)
   email.ts                      sendOrderEmails() — admin + customer HTML emails
-  shipping.ts                   calcShipping(city, subtotal)
+  shipping.ts                   calcShipping(city, subtotal) — pure, client-safe
+  shippingQuote.ts               getShippingFee() — server-only, calls Lalamove
+  lalamove.ts                   Lalamove v3 signed HMAC client, prefers pin over geocoding
+  geocoding.ts                  Nominatim (OSM) free-text geocode(), used as pre-fill + fallback only
+  phLocations.ts                Province/City/ZIP dataset — 6-province delivery coverage (D10)
   session.ts                    HMAC cookie session helpers
 middleware.ts                   Guards /admin/* (except /admin/login)
 ```
@@ -90,14 +97,23 @@ Run once in the Neon SQL editor.
 3. `sendOrderEmails()` fires admin notification + customer confirmation. Email failure
    is caught/logged and does **not** fail the order (fire-and-forget `.catch`).
 
-## Shipping (`lib/shipping.ts`)
+## Shipping (`lib/shipping.ts` + `lib/shippingQuote.ts`, see decision.md D9)
 ```
-calcShipping(city, subtotal):
-  normalize city (trim, lowercase, strip trailing "city")
-  if city == "pasig" && subtotal >= 1000  → ₱0 (free)
-  else → ₱99
+getShippingFee(dest, subtotal):     // lib/shippingQuote.ts, server-only
+  if isFreeShippingEligible(city, subtotal) → ₱0
+  else try live Lalamove MOTORCYCLE quote for dest (geocoded via Nominatim)
+       → real distance-based fee
+  else (no coverage / geocode fail / API error / pickup env unset) → ₱99 flat
 ```
-Free shipping is **Pasig-only** above ₱1000; everyone else pays ₱99 flat.
+Free shipping is still **Pasig-only** above ₱1000. Everyone else gets a live
+Lalamove quote when possible, otherwise the ₱99 flat fallback — same number as
+before this feature. `lib/shipping.ts` only holds the pure/client-safe pieces
+(`FLAT_SHIPPING_FEE`, `isFreeShippingEligible`, `calcShipping`); the
+Lalamove-aware orchestrator is a separate server-only file on purpose (see D9)
+so the 'use client' checkout page can keep importing from `shipping.ts`
+without pulling Node `crypto` / API secrets into the browser bundle.
+`POST /api/orders` is the only authoritative caller — `POST /api/shipping/quote`
+is a checkout-preview endpoint only.
 
 ## Auth / admin (`lib/session.ts`, `middleware.ts`)
 - Cookie `mmc_admin`, HMAC-SHA256 token of `${username}:${secret}` (Web Crypto `crypto.subtle`).
@@ -123,6 +139,10 @@ Single GET returns: `today`/`week`/`all` order counts + revenue, `pendingCount`,
 | `ADMIN_PASSWORD` | Admin login (fallback `'gimcontz'`) |
 | `SESSION_SECRET` | HMAC secret (`openssl rand -hex 32`; dev fallback exists) |
 | `NEXT_PUBLIC_URL` | Base URL used in email "View in Admin" link |
+| `LALAMOVE_API_KEY` / `LALAMOVE_SECRET_KEY` | Lalamove sandbox/prod key pair (Partner Portal → Developers) |
+| `LALAMOVE_ENV` | `production` to use live keys/base URL; unset = sandbox |
+| `LALAMOVE_MARKET` | Market header code; unset defaults to `PH` |
+| `LALAMOVE_PICKUP_ADDRESS` / `_LAT` / `_LNG` | Shop pickup point Lalamove quotes from; unset = flat-rate fallback only (D9) |
 
 ## Design system
 - All color tokens prefixed `espresso-` (50/100 cream → 400 caramel-gold CTA →
