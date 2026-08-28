@@ -7,6 +7,7 @@ import classicLatte from '@/app/assets/flavors/classic_latte.png'
 import honeyOat from '@/app/assets/flavors/honey_oat.png'
 import caramel from '@/app/assets/flavors/caramel.png'
 import tonic from '@/app/assets/flavors/tonic.png'
+import aconchegoBeans from '@/app/assets/aconchengo.jpg'
 
 const mixtures = [
   {
@@ -118,19 +119,26 @@ export default function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Visual card */}
             <div className="relative">
-              <div className="w-full h-80 lg:h-96 bg-gradient-to-br from-espresso-700 via-espresso-800 to-espresso-900 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center relative">
-                <div className="absolute top-8 right-8 w-32 h-32 rounded-full bg-espresso-600/20" />
-                <div className="absolute bottom-6 left-6 w-20 h-20 rounded-full bg-espresso-600/15" />
-                <div className="text-center z-10">
-                  <div className="text-7xl mb-4 select-none">🫘</div>
-                  <p className="text-espresso-500 text-xs tracking-widest uppercase mb-1">Signature Blend</p>
+              <div className="w-full h-80 lg:h-96 rounded-3xl overflow-hidden shadow-2xl flex items-center justify-center relative">
+                <Image
+                  src={aconchegoBeans}
+                  alt="Two hands cradling freshly roasted Aconchego coffee beans"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  placeholder="blur"
+                />
+                {/* Dark wash so the blend name stays legible over the photo */}
+                <div className="absolute inset-0 bg-gradient-to-t from-espresso-900/90 via-espresso-900/55 to-espresso-900/35" />
+                <div className="text-center z-10 px-6">
+                  <p className="text-espresso-200 text-xs tracking-widest uppercase mb-1">Signature Blend</p>
                   <p
-                    className="text-espresso-300 text-3xl font-bold"
+                    className="text-espresso-50 text-3xl font-bold"
                     style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
                   >
                     Aconchego
                   </p>
-                  <p className="text-espresso-500 text-sm mt-1">Cambodia × Indonesia</p>
+                  <p className="text-espresso-200 text-sm mt-1">Cambodia × Indonesia</p>
                 </div>
               </div>
               {/* Floating tag */}
