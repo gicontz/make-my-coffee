@@ -39,3 +39,12 @@ export async function getSessionToken(): Promise<string | null> {
   const cookieStore = await cookies()
   return cookieStore.get(COOKIE_NAME)?.value ?? null
 }
+
+// Cookie check for API routes. middleware.ts only matches `/admin/:path*`
+// (pages), so route handlers under /api/admin must assert this themselves.
+export async function isAdminAuthenticated(): Promise<boolean> {
+  const token = await getSessionToken()
+  if (!token) return false
+  const expected = await createToken(process.env.ADMIN_USERNAME || 'admin')
+  return token === expected
+}

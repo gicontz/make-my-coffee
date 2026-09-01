@@ -9,6 +9,7 @@ import bottleImg from '@/app/assets/bottle.png'
 import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
+import { isValidCode, normalizeCode, type AppliedVoucher } from '@/lib/vouchers'
 import type { LatLng, SuggestionPrecision } from '@/components/DeliveryMapPicker'
 
 // Leaflet needs `window` — load client-only, no SSR.
@@ -59,8 +60,24 @@ export default function OrderPage() {
   // POST /api/orders recomputes the real fee server-side regardless of this.
   const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null)
   const [quoting, setQuoting] = useState(false)
-  const shipping = shippingQuote?.fee ?? FLAT_SHIPPING_FEE
-  const orderTotal = total + shipping
+
+  // Voucher. Like the shipping quote above, this is a *preview* — POST
+  // /api/orders re-looks-up the code, re-prices it and takes the redemption
+  // slot itself, so nothing here decides what the customer is charged.
+  const [voucherInput, setVoucherInput] = useState('')
+  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null)
+  const [voucherError, setVoucherError] = useState('')
+  const [checkingVoucher, setCheckingVoucher] = useState(false)
+
+  const quotedShipping = shippingQuote?.fee ?? FLAT_SHIPPING_FEE
+  const shipping = voucher?.freeShipping ? 0 : quotedShipping
+  const discount = voucher?.discount ?? 0
+  const orderTotal = total - discount + shipping
+
+  // The success screen renders after clearCart(), so `total` is already 0 by
+  // then — snapshot what the customer owes at submit time instead of
+  // recomputing it from an emptied cart.
+  const [placedTotal, setPlacedTotal] = useState(0)
 
   // guard: don't run on server
   const [hydrated, setHydrated] = useState(false)
@@ -167,6 +184,46 @@ export default function OrderPage() {
   const hasMorningSlot = deliverySlots.some(id => slotsInPeriod('morning').some(s => s.id === id))
   const hasAfternoonSlot = deliverySlots.some(id => slotsInPeriod('afternoon').some(s => s.id === id))
 
+  async function applyVoucherCode() {
+    const code = normalizeCode(voucherInput)
+    setVoucherError('')
+
+    if (!isValidCode(code)) {
+      setVoucherError('Enter a valid voucher code.')
+      return
+    }
+
+    setCheckingVoucher(true)
+    try {
+      const res = await fetch('/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Email is sent so a once-per-customer voucher can be rejected here
+        // rather than at the very end of checkout. It may still be blank at
+        // this point — the server treats it as optional.
+        body: JSON.stringify({ code, subtotal: total, email: form.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setVoucher(null)
+        setVoucherError(data.error || 'That voucher code isn’t valid.')
+        return
+      }
+      setVoucher(data)
+      setVoucherInput(code)
+    } catch {
+      setVoucherError('Couldn’t check that voucher. Please try again.')
+    } finally {
+      setCheckingVoucher(false)
+    }
+  }
+
+  function removeVoucher() {
+    setVoucher(null)
+    setVoucherInput('')
+    setVoucherError('')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -193,10 +250,12 @@ export default function OrderPage() {
           })),
           subtotal: total,
           deliverySlots,
+          voucherCode: voucher?.code ?? null,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to place order')
+      setPlacedTotal(orderTotal)
       clearCart()
       setOrderId(data.orderId)
     } catch (err) {
@@ -232,7 +291,7 @@ export default function OrderPage() {
             </p>
           )}
           <p className="text-espresso-400 text-sm mb-8">
-            Payment is <strong>Cash on Delivery</strong>. Please have ₱{orderTotal.toLocaleString()} ready when your order arrives.
+            Payment is <strong>Cash on Delivery</strong>. Please have ₱{placedTotal.toLocaleString()} ready when your order arrives.
           </p>
           <Link href="/" className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors">
             Back to Home
@@ -479,16 +538,94 @@ export default function OrderPage() {
                   ))}
                 </div>
 
+                {/* Voucher */}
+                <div className="border-t border-espresso-100 pt-4 mb-4">
+                  {voucher ? (
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-3.5 py-3">
+                      <div className="flex items-start gap-2.5">
+                        <svg className="flex-shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-green-800 font-bold text-sm font-mono truncate">{voucher.code}</p>
+                          <p className="text-green-700 text-xs">{voucher.description || voucher.label}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeVoucher}
+                          className="flex-shrink-0 text-green-700 hover:text-green-900 text-xs font-semibold underline underline-offset-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label htmlFor="voucher" className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">
+                        Voucher Code
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          id="voucher"
+                          type="text"
+                          value={voucherInput}
+                          onChange={e => { setVoucherInput(e.target.value); setVoucherError('') }}
+                          // The voucher field lives inside the checkout <form>, so a
+                          // bare Enter here would place the order instead of applying
+                          // the code. Intercept it.
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              applyVoucherCode()
+                            }
+                          }}
+                          autoComplete="off"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                          placeholder="Enter code"
+                          aria-invalid={!!voucherError}
+                          aria-describedby={voucherError ? 'voucher-error' : undefined}
+                          className={`${inputCls} flex-1 min-w-0 uppercase font-mono tracking-wide`}
+                        />
+                        <button
+                          type="button"
+                          onClick={applyVoucherCode}
+                          disabled={checkingVoucher || !voucherInput.trim()}
+                          className="flex-shrink-0 px-5 rounded-xl bg-espresso-100 hover:bg-espresso-200 disabled:opacity-50 disabled:cursor-not-allowed text-espresso-700 text-sm font-bold transition-colors"
+                        >
+                          {checkingVoucher ? '…' : 'Apply'}
+                        </button>
+                      </div>
+                      {voucherError && (
+                        <p id="voucher-error" role="alert" className="text-red-600 text-xs mt-1.5">{voucherError}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+
                 <div className="border-t border-espresso-100 pt-4 mb-4 space-y-2.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-espresso-500">Subtotal</span>
                     <span className="text-espresso-900 font-medium">₱{total.toLocaleString()}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600">Voucher discount</span>
+                      <span className="text-green-600 font-semibold">− ₱{discount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div>
                     <div className="flex justify-between text-sm">
                       <span className="text-espresso-500">Shipping</span>
                       <span className={shipping === 0 ? 'text-green-600 font-semibold' : 'text-espresso-900 font-medium'}>
-                        {quoting ? 'Calculating…' : shipping === 0 ? 'Free' : `₱${shipping}`}
+                        {quoting ? 'Calculating…' : shipping === 0 ? (
+                          <>
+                            {voucher?.freeShipping && quotedShipping > 0 && (
+                              <span className="text-espresso-300 line-through font-normal mr-1.5">₱{quotedShipping}</span>
+                            )}
+                            Free
+                          </>
+                        ) : `₱${shipping}`}
                       </span>
                     </div>
                     {!quoting && shippingQuote?.source === 'lalamove' && (

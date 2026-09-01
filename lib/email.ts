@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { slotLabel } from '@/lib/deliverySlots'
+import type { AppliedVoucher } from '@/lib/vouchers'
 
 interface OrderItem {
   id: string
@@ -25,24 +26,51 @@ export interface OrderEmailData {
   }
   items: OrderItem[]
   subtotal: number
+  discount: number
   shipping: number
   total: number
   deliverySlots?: string[]
+  voucher?: AppliedVoucher | null
 }
 
 // Web-safe stack — Outlook ignores `system-ui` and falls back to Times.
 const FONT = "Arial,'Helvetica Neue',Helvetica,sans-serif"
 
+let warnedNoCredentials = false
+
+// nodemailer's jsonTransport resolves sendMail() without opening a socket, so
+// the whole compose path still runs — templates rendered, both messages built —
+// while nothing dials smtp.gmail.com.
+function mockTransport() {
+  return nodemailer.createTransport({ jsonTransport: true })
+}
+
 function createTransport() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      // Gmail app passwords are shown in 4 space-separated groups for
-      // readability; the spaces aren't part of the secret — strip them.
-      pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ''),
-    },
-  })
+  const user = process.env.GMAIL_USER
+  // Gmail app passwords are shown in 4 space-separated groups for
+  // readability; the spaces aren't part of the secret — strip them.
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '')
+
+  // Set by the e2e server (playwright.config.ts). Every order-placing test
+  // would otherwise attempt a real Gmail login and fail auth, and repeated
+  // failed auth from one IP is how a sender gets flagged as a bot.
+  if (process.env.EMAIL_TRANSPORT === 'json') return mockTransport()
+
+  // Absent credentials are a misconfiguration in production — but dialling
+  // Gmail to discover that only burns more failed logins. Mock and say so
+  // instead. Either way the order is unaffected: sendOrderEmails is
+  // fire-and-forget by design (decision.md D5).
+  if (!user || !pass) {
+    if (!warnedNoCredentials) {
+      console.warn(
+        'GMAIL_USER / GMAIL_APP_PASSWORD are not set — order email is being mocked, not delivered.'
+      )
+      warnedNoCredentials = true
+    }
+    return mockTransport()
+  }
+
+  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
 }
 
 function itemsTable(items: OrderItem[]): string {
@@ -71,13 +99,34 @@ function itemsTable(items: OrderItem[]): string {
     </table>`
 }
 
-// Totals block (subtotal / shipping / total) shared by both emails.
-function totalsTable(subtotal: number, shipping: number, total: number, totalLabel: string, freeHtml: string): string {
+// Totals block (subtotal / discount / shipping / total) shared by both emails.
+// The discount row only appears when a voucher actually took money off — a
+// free-delivery voucher shows up on the shipping row instead, so rendering an
+// unconditional "− ₱0" line would read as a bug to the customer.
+function totalsTable(
+  subtotal: number,
+  discount: number,
+  shipping: number,
+  total: number,
+  totalLabel: string,
+  freeHtml: string,
+  voucher?: AppliedVoucher | null
+): string {
   const td = `padding:6px 0;font-family:${FONT};font-size:14px;color:#5C3317;`
+  const discountRow = discount > 0
+    ? `<tr>
+         <td style="${td}color:#16a34a;">Voucher${voucher ? ` (${voucher.code})` : ''}</td>
+         <td style="${td}text-align:right;color:#16a34a;font-weight:600;">− ₱${discount.toLocaleString()}</td>
+       </tr>`
+    : ''
+  const shippingValue = shipping === 0
+    ? (voucher?.freeShipping ? `<span style="color:#16a34a;font-weight:600;">Free (${voucher.code})</span>` : freeHtml)
+    : '₱' + shipping
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
       <tr><td style="${td}">Subtotal</td><td style="${td}text-align:right;">₱${subtotal.toLocaleString()}</td></tr>
-      <tr><td style="${td}">Shipping</td><td style="${td}text-align:right;">${shipping === 0 ? freeHtml : '₱' + shipping}</td></tr>
+      ${discountRow}
+      <tr><td style="${td}">Shipping</td><td style="${td}text-align:right;">${shippingValue}</td></tr>
       <tr>
         <td style="padding:12px 0 0;border-top:2px solid #F5E6D3;font-family:${FONT};font-weight:700;font-size:16px;color:#1C0A00;">${totalLabel}</td>
         <td style="padding:12px 0 0;border-top:2px solid #F5E6D3;font-family:${FONT};text-align:right;font-weight:700;font-size:18px;color:#C8860A;">₱${total.toLocaleString()}</td>
@@ -147,7 +196,7 @@ function base(content: string): string {
 
 export async function sendOrderEmails(data: OrderEmailData) {
   const transporter = createTransport()
-  const { orderId, customer, items, subtotal, shipping, total, deliverySlots } = data
+  const { orderId, customer, items, subtotal, discount, shipping, total, deliverySlots, voucher } = data
   const customerName = `${customer.firstName} ${customer.lastName}`
   const deliveryWindow = deliverySlots?.length
     ? [...deliverySlots].sort().map(slotLabel).join(', ')
@@ -180,12 +229,13 @@ export async function sendOrderEmails(data: OrderEmailData) {
         ${customer.barangay ? detailRow('Barangay', customer.barangay) : ''}
         ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
         ${deliveryWindow ? detailRow('Delivery Time', deliveryWindow) : ''}
+        ${voucher ? detailRow('Voucher', `<strong>${voucher.code}</strong> — ${voucher.label}`) : ''}
         ${customer.notes ? detailRow('Notes', customer.notes) : ''}
       </table>
 
       ${itemsTable(items)}
 
-      ${totalsTable(subtotal, shipping, total, 'Total (COD)', 'Free')}
+      ${totalsTable(subtotal, discount, shipping, total, 'Total (COD)', 'Free', voucher)}
 
       ${button(`${process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe'}/admin/orders`, 'View in Admin →')}
     `),
@@ -205,7 +255,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
 
       ${itemsTable(items)}
 
-      ${totalsTable(subtotal, shipping, total, 'Total to pay on delivery', '<span style="color:#16a34a;font-weight:600;">Free</span>')}
+      ${totalsTable(subtotal, discount, shipping, total, 'Total to pay on delivery', '<span style="color:#16a34a;font-weight:600;">Free</span>', voucher)}
 
       ${infoBox(
         '#FAF6F1',
