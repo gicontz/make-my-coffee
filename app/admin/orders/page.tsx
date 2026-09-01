@@ -18,6 +18,8 @@ interface Order {
   delivery_lng: string | null
   items: { name: string; shots: number; price: number; quantity: number }[]
   subtotal: number
+  discount: number
+  voucher_code: string
   shipping: number
   shipping_source: string
   shipping_distance_km: string | null
@@ -184,6 +186,19 @@ export default function AdminOrders() {
                       <div className="flex justify-between text-sm text-espresso-500">
                         <span>Subtotal</span><span>₱{order.subtotal.toLocaleString()}</span>
                       </div>
+                      {order.voucher_code && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>
+                            Voucher
+                            <span className="ml-1.5 inline-flex px-1.5 py-px rounded-full text-[10px] font-mono font-semibold bg-green-50 border border-green-200 align-middle">
+                              {order.voucher_code}
+                            </span>
+                          </span>
+                          {/* A free-delivery voucher takes nothing off the
+                              subtotal — it shows on the shipping row instead. */}
+                          <span>{order.discount > 0 ? `− ₱${order.discount.toLocaleString()}` : 'Free delivery'}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-sm text-espresso-500">
                         <span>
                           Shipping

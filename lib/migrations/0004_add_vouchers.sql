@@ -1,51 +1,20 @@
--- Run this once in the Neon SQL editor after creating your project
-
-CREATE TABLE IF NOT EXISTS orders (
-  id             SERIAL PRIMARY KEY,
-  first_name     TEXT NOT NULL,
-  last_name      TEXT NOT NULL,
-  email          TEXT NOT NULL,
-  phone          TEXT,
-  address        TEXT,
-  barangay       TEXT NOT NULL DEFAULT '',
-  city           TEXT,
-  province       TEXT,
-  postal_code    TEXT,
-  notes          TEXT,
-  items          JSONB NOT NULL,
-  subtotal       INTEGER NOT NULL,
-  discount       INTEGER NOT NULL DEFAULT 0,
-  shipping       INTEGER NOT NULL DEFAULT 0,
-  total          INTEGER NOT NULL,
-  voucher_code   TEXT NOT NULL DEFAULT '',
-  payment_method TEXT NOT NULL DEFAULT 'cod',
-  payment_status TEXT NOT NULL DEFAULT 'unpaid',
-  order_status   TEXT NOT NULL DEFAULT 'pending',
-  delivery_slots TEXT[] NOT NULL DEFAULT '{}',
-  shipping_source TEXT NOT NULL DEFAULT 'flat',
-  shipping_distance_km NUMERIC,
-  delivery_lat   NUMERIC,
-  delivery_lng   NUMERIC,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Applied to the live DB via lib/migrations/0001_add_delivery_slots.sql,
--- 0002_add_shipping_source.sql, 0003_add_barangay_and_pin.sql and
--- 0004_add_vouchers.sql; included here too so a fresh setup doesn't need the
--- migrations separately.
-
-CREATE INDEX IF NOT EXISTS orders_order_status_idx  ON orders (order_status);
-CREATE INDEX IF NOT EXISTS orders_created_at_idx    ON orders (created_at DESC);
-
--- ── Vouchers (0004) — see memory/decision.md D11 ──
+-- Vouchers: admin-created discount codes redeemed by customers at checkout.
+-- See memory/decision.md D11.
+--
+-- Run once against the Neon DB (this project has no migration runner; apply
+-- manually via the Neon SQL editor, same as the earlier migrations).
 
 CREATE TABLE IF NOT EXISTS vouchers (
   id               SERIAL PRIMARY KEY,
+  -- Always stored normalized (uppercase, no spaces) by normalizeCode() in
+  -- lib/vouchers.ts, so a plain UNIQUE is enough to make lookups
+  -- case-insensitive without a functional index.
   code             TEXT NOT NULL UNIQUE,
   description      TEXT NOT NULL DEFAULT '',
   discount_type    TEXT NOT NULL,
+  -- percent: 1-100. fixed: pesos off the subtotal. free_shipping: unused (0).
   discount_value   INTEGER NOT NULL DEFAULT 0,
+  -- Percent vouchers only — caps the peso value of the discount. NULL = uncapped.
   max_discount     INTEGER,
   min_subtotal     INTEGER NOT NULL DEFAULT 0,
   max_redemptions  INTEGER,
@@ -66,11 +35,19 @@ CREATE TABLE IF NOT EXISTS vouchers (
   CONSTRAINT vouchers_window_chk  CHECK (starts_at IS NULL OR expires_at IS NULL OR expires_at > starts_at)
 );
 
+-- One row per successful redemption. Kept even when max_redemptions is NULL —
+-- it is the audit log behind vouchers.redemption_count.
 CREATE TABLE IF NOT EXISTS voucher_redemptions (
   id         SERIAL PRIMARY KEY,
   voucher_id INTEGER NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+  -- NULL only for the brief window between claiming the voucher and the
+  -- order row existing (see claimVoucher/attachOrder in lib/voucherStore.ts).
   order_id   INTEGER REFERENCES orders(id) ON DELETE SET NULL,
   email      TEXT NOT NULL,
+  -- lower(email) when the voucher is once_per_email, otherwise NULL. Postgres
+  -- treats NULLs as distinct in a unique index, so this one index enforces
+  -- "one use per email" for the vouchers that want it and constrains nothing
+  -- for the ones that don't — no partial index across tables needed.
   email_uniq TEXT,
   discount   INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -82,5 +59,7 @@ CREATE INDEX IF NOT EXISTS voucher_redemptions_voucher_idx ON voucher_redemption
 
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS voucher_id   INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+  -- Denormalized on purpose: the code as redeemed survives the voucher being
+  -- deleted, same reasoning as the JSONB items snapshot (decision.md D8).
   ADD COLUMN IF NOT EXISTS voucher_code TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS discount     INTEGER NOT NULL DEFAULT 0;

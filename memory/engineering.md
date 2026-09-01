@@ -20,6 +20,8 @@
 npm run dev     # http://localhost:3000
 npm run build
 npm start
+npm test        # unit: node:test + Node 22 type stripping — no test framework dependency
+npm run test:e2e  # Playwright — needs a throwaway DB in .env.e2e, see e2e/README.md
 ```
 
 ## Directory map
@@ -35,9 +37,11 @@ app/
     page.tsx, login/page.tsx
     dashboard/page.tsx          Stats + SalesChart
     orders/page.tsx             Orders table, status controls
+    vouchers/page.tsx           Voucher list + create/edit dialog (D11)
   api/
     orders/route.ts             POST — create order, insert, send emails
     shipping/quote/route.ts     POST — checkout preview only, not authoritative
+    vouchers/validate/route.ts  POST — checkout preview only, not authoritative (D11)
     geocode/route.ts            POST — map-pin pre-fill guess only, not authoritative
     admin/
       login/route.ts            POST — credential check, set session cookie
@@ -45,6 +49,8 @@ app/
       orders/route.ts           GET — list orders (?status= filter)
       orders/[id]/route.ts      PATCH — update order_status / payment_status
       stats/route.ts            GET — dashboard aggregates
+      vouchers/route.ts         GET list / POST create  (admin-cookie guarded)
+      vouchers/[id]/route.ts    PATCH edit or toggle / DELETE (admin-cookie guarded)
   assets/                       bottle.png, hero_splash.png, flavors/*.png
 components/
   Navbar.tsx, Footer.tsx, HeroSection.tsx
@@ -52,7 +58,7 @@ components/
   admin/Sidebar.tsx, admin/SalesChart.tsx
 context/CartContext.tsx         Cart provider + useCart hook
 lib/
-  products.ts                   Product type + 3 products (single source of truth)
+  products.ts                   Product type + 3 products + priceOrderItems() (D8, D12)
   db.ts                         neon() sql client (throws if DATABASE_URL unset)
   db-setup.sql                  one-time orders table DDL (run in Neon)
   email.ts                      sendOrderEmails() — admin + customer HTML emails
@@ -61,8 +67,20 @@ lib/
   lalamove.ts                   Lalamove v3 signed HMAC client, prefers pin over geocoding
   geocoding.ts                  Nominatim (OSM) free-text geocode(), used as pre-fill + fallback only
   phLocations.ts                Province/City/ZIP dataset — 6-province delivery coverage (D10)
-  session.ts                    HMAC cookie session helpers
-middleware.ts                   Guards /admin/* (except /admin/login)
+  vouchers.ts                   Pure voucher math + rule checks, client-safe (D11)
+  voucherStore.ts               Server-only voucher lookup + atomic claim/release (D11)
+  voucherInput.ts               Admin create/edit input validation (D11)
+  session.ts                    HMAC cookie session helpers + isAdminAuthenticated()
+middleware.ts                   Guards /admin/* pages (except /admin/login) — NOT /api/admin/*
+tests/                          node:test unit suites, run with `npm test`
+  vouchers.test.ts              Discount math, rule checks, admin input validation
+  pricing.test.ts               priceOrderItems() catalog re-pricing
+e2e/                            Playwright suite, run with `npm run test:e2e` — see e2e/README.md
+  voucher-admin.spec.ts         Admin backoffice: create/edit/toggle/delete
+  voucher-checkout.spec.ts      Customer journey + resulting order rows
+  voucher-api.spec.ts           Authorization, payload tampering, concurrency
+  helpers/                      DB seeding + cleanup (with a prod-DB guard), page objects
+playwright.config.ts            Starts its own next dev with Gmail/Lalamove creds withheld
 ```
 
 ## Products (`lib/products.ts` — do not duplicate)
@@ -91,11 +109,28 @@ Run once in the Neon SQL editor.
 - `payment_status`: `unpaid | paid`
 
 ## Order flow
-1. `app/order/page.tsx` posts `{ customer, items, subtotal }` to `POST /api/orders`.
-2. Route recomputes shipping server-side via `calcShipping` (never trusts client total),
-   computes `total = subtotal + shipping`, inserts row, returns `{ orderId }`.
+1. `app/order/page.tsx` posts `{ customer, items, deliverySlots, voucherCode }` to
+   `POST /api/orders`. It also posts a `subtotal`, which the server **ignores**.
+2. Route re-prices the cart from the catalog (`priceOrderItems`, D12), recomputes
+   shipping via `getShippingFee` (D9), re-resolves and atomically claims the
+   voucher (D11), computes `total = subtotal - discount + shipping`, inserts the
+   row, returns `{ orderId }`. Nothing priced by the client is trusted.
 3. `sendOrderEmails()` fires admin notification + customer confirmation. Email failure
    is caught/logged and does **not** fail the order (fire-and-forget `.catch`).
+
+## Vouchers (`lib/vouchers.ts` + `lib/voucherStore.ts`, see decision.md D11)
+```
+POST /api/vouchers/validate    // preview: price a code against the cart
+POST /api/orders               // authoritative: re-price AND take the slot
+```
+Types: `percent` (optional ₱ cap) | `fixed` | `free_shipping`, one per voucher.
+Rules, all optional and admin-set: `min_subtotal`, `max_redemptions`,
+`once_per_email`, `starts_at`/`expires_at`.
+Money: `total = subtotal - discount + shipping`; `orders.discount` is the
+subtotal reduction only, a free-delivery voucher shows as `shipping = 0`.
+The redemption slot is taken by `claimVoucher()` with a guarded UPDATE plus a
+unique-index insert (no interactive transactions on the Neon HTTP driver), and
+released if the order insert then fails.
 
 ## Shipping (`lib/shipping.ts` + `lib/shippingQuote.ts`, see decision.md D9)
 ```

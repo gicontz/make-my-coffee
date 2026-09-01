@@ -15,8 +15,13 @@ yarn-error.log*
 # Env
 .env*
 !.env.example
+!.env.e2e.example
 
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Playwright artifacts
+test-results/
+playwright-report/

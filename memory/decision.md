@@ -178,12 +178,101 @@ the customer to confirm a literal pin is.
   the well-known default-icon-path-under-webpack breakage, and matches brand
   color instead of Leaflet's default blue).
 
+## D11 — Vouchers: admin-created codes, priced and claimed server-side
+**Decision:** Discount codes customers redeem at checkout. Three types
+(`percent`, `fixed`, `free_shipping`), one per voucher, each with four
+admin-configurable rules: minimum spend, total redemption cap, one-use-per-
+email, and a validity window. Managed at `/admin/vouchers`.
+**Why:** First promotional lever the shop has. Built to the same rule as D3/D9:
+the browser may preview a price, only the server may decide one.
+**Implications:**
+- **File split mirrors D9.** `lib/vouchers.ts` is pure and client-safe (types,
+  `normalizeCode`, `calcVoucherDiscount`, `checkVoucherRules`, `applyVoucher`)
+  so the `'use client'` checkout page can import the discount math directly.
+  Everything touching Postgres lives in the server-only `lib/voucherStore.ts`.
+  `lib/voucherInput.ts` holds admin create/edit validation — in `lib/` and not
+  in the route file because Next type-checks `route.ts` modules and rejects
+  exports that aren't handlers or config.
+- **`POST /api/vouchers/validate` is preview-only**, exactly like
+  `/api/shipping/quote`. `POST /api/orders` re-looks-up the code, re-prices it
+  and takes the redemption slot itself.
+- **Claiming is atomic**, because the Neon HTTP driver has no interactive
+  transactions. `claimVoucher()` does a guarded `UPDATE ... WHERE is_active AND
+  window ok AND redemption_count < max_redemptions RETURNING id` (so the cap
+  can't be oversold under concurrency), then inserts the redemption row whose
+  unique index enforces one-per-email. If that insert loses the race the
+  increment is rolled back. If the *order* insert then fails, the claim is
+  released — a failed order must not burn a redemption.
+- **One-per-email without accounts** is done with a `email_uniq` column on
+  `voucher_redemptions`, set to `lower(email)` only when the voucher has the
+  rule and `NULL` otherwise. Postgres treats NULLs as distinct in a unique
+  index, so a single index enforces the rule for the vouchers that want it and
+  constrains nothing for the rest. The pre-check in the validate endpoint is
+  UX only; the index is what binds.
+- **Money model:** `total = subtotal - discount + shipping`. `orders.discount`
+  is the subtotal reduction only; a `free_shipping` voucher shows up as
+  `shipping = 0` instead. `voucher_redemptions.discount` records the *total*
+  pesos forgone (discount + any waived delivery) for reporting.
+- **The free-Pasig ₱1000 threshold (D3) is judged on the pre-discount
+  subtotal**, so a voucher can only ever make delivery cheaper, never dearer.
+- `discount_value` is unvalidated at the type level, so the DB carries CHECK
+  constraints (percent 1–100, fixed > 0, expiry after start) as a backstop to
+  `lib/voucherInput.ts` — the schema stays correct even if a future caller
+  skips the validator.
+- **Deleting a redeemed voucher is refused** (409) — it would cascade its
+  redemption rows away and null out `orders.voucher_id`, losing the audit trail
+  behind discounts already given. Deactivating is the intended path, and the
+  admin UI only offers Delete on never-redeemed vouchers.
+- `redemption_count` is never writable through the admin edit endpoint; it is
+  owned by `claimVoucher`/`releaseVoucher`. Letting an edit reset it would hand
+  back already-spent redemption slots.
+- Admin datetime inputs are pinned to **Asia/Manila (fixed UTC+8 — PH has had
+  no DST since 1978)** in both directions rather than inheriting the browser's
+  clock, so a voucher window means the same thing regardless of where admin is.
+- `/api/admin/vouchers*` check the session cookie **in the route handler** via
+  `isAdminAuthenticated()` (`lib/session.ts`). `middleware.ts` matches only
+  `/admin/:path*` — pages — so it does not cover any `/api/admin/*` route. See
+  the open items below.
+
+## D12 — Order money is re-derived from the catalog, not the request
+**Decision:** `POST /api/orders` ignores the posted `subtotal` and the posted
+per-item prices entirely. `priceOrderItems()` (`lib/products.ts`) re-prices the
+cart from the catalog by product id + quantity; an unknown id or a
+non-whole/out-of-range quantity rejects the order with a 400.
+**Why:** The route previously inserted the client's `subtotal` verbatim and
+snapshotted the client's own price fields — so the browser decided what it
+owed. D7 already claimed "a tampered localStorage cart can't change pricing";
+that was true of shipping but **not** of the subtotal. Vouchers made it
+material rather than theoretical: minimum-spend gating and percentage discounts
+are both computed from the subtotal, so a tampered cart could unlock vouchers
+it didn't qualify for and scale a percentage discount without limit.
+**Implications:** The `items` JSONB snapshot now stores catalog-derived
+name/shots/price, so historical orders can't contain prices the shop never
+charged. `MAX_LINE_QUANTITY` (99) bounds a single line — a sanity check, not
+inventory (there is still no stock tracking). Products removed from
+`lib/products.ts` become unorderable immediately, which is the intended
+behavior for a delisted item.
+
 ---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.
 - Default admin credentials and dev `SESSION_SECRET` fallback must not ship to prod.
 - No automated DB migrations; schema changes are manual SQL.
 - No inventory/stock tracking — orders can be placed regardless of stock.
+- **`/api/admin/*` is not covered by `middleware.ts`** (its matcher is
+  `/admin/:path*`, which is pages only). The voucher admin routes assert the
+  session themselves via `isAdminAuthenticated()`, but `api/admin/orders`,
+  `api/admin/orders/[id]` and `api/admin/stats` predate that helper and are
+  still reachable unauthenticated. Fix is either the same guard in each or
+  adding `/api/admin/:path*` to the middleware matcher.
+- `POST /api/vouchers/validate` is unauthenticated and unthrottled by nature
+  (customers must be able to try codes), so short codes are guessable. Prefer
+  8+ character codes for anything valuable; a rate limit is the real fix.
+- Vouchers are one-per-order and one type per voucher — no stacking, and no
+  "10% off *and* free delivery" in a single code (that needs two codes today).
+- A voucher redemption is claimed at order creation and is **not** returned if
+  the order is later cancelled in admin — a cancelled order still consumes its
+  slot.
 - No order-confirmation page persistence beyond the returned `orderId`.
 - Lalamove pickup location (`LALAMOVE_PICKUP_ADDRESS/LAT/LNG`) not yet set in
   `.env.local` — until it is, every order still gets the flat ₱99/free-Pasig
