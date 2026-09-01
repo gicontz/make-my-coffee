@@ -34,11 +34,19 @@ cp .env.e2e.example .env.e2e
 ## What the test server does *not* get
 
 `playwright.config.ts` starts its own `next dev` with a deliberately stripped
-environment: no Gmail credentials and no Lalamove keys. Both integrations
-already fail soft — order email is fire-and-forget (D5) and the shipping quote
-falls back to the flat ₱99 rate (D9) — so withholding the credentials means the
-suite never emails a real person, never calls the courier API, and gets a
-deterministic delivery fee to assert against.
+environment: no Gmail credentials, no Lalamove keys, and `EMAIL_TRANSPORT=json`.
+
+That last one matters. Withholding the Gmail credentials stops mail going out,
+but nodemailer still dials smtp.gmail.com and fails authentication — so every
+order-placing test was a failed Gmail login from your IP, which is how a sender
+gets flagged. `EMAIL_TRANSPORT=json` selects nodemailer's `jsonTransport`, which
+resolves `sendMail()` without opening a socket. The compose path still runs, so
+a template that throws still fails the test.
+
+Both integrations also fail soft by design — order email is fire-and-forget (D5)
+and the shipping quote falls back to the flat ₱99 rate (D9) — so the suite never
+emails a real person, never calls the courier API, and gets a deterministic
+delivery fee to assert against.
 
 ## Layout
 

@@ -38,14 +38,19 @@ export default defineConfig({
     timeout: 120_000,
     // The server must see the *test* database and must not see live Gmail or
     // Lalamove credentials — an order-placing test would otherwise email real
-    // people and call a real courier API. Both integrations already fail soft
-    // (email is fire-and-forget, Lalamove falls back to the flat rate), so
-    // simply withholding the credentials is enough to neutralise them.
+    // people and call a real courier API.
+    //
+    // Withholding the credentials is not quite enough for email: nodemailer
+    // still dials smtp.gmail.com and fails auth, so every order-placing test
+    // was a failed Gmail login from this IP. EMAIL_TRANSPORT=json swaps in
+    // nodemailer's jsonTransport, which never opens a socket. Lalamove needs
+    // no equivalent — it falls back to the flat rate before making a call.
     env: {
       DATABASE_URL: process.env.E2E_DATABASE_URL ?? '',
       ADMIN_USERNAME: process.env.E2E_ADMIN_USERNAME ?? 'admin',
       ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD ?? 'e2e-password',
       SESSION_SECRET: process.env.E2E_SESSION_SECRET ?? 'e2e-session-secret',
+      EMAIL_TRANSPORT: 'json',
       GMAIL_USER: '',
       GMAIL_APP_PASSWORD: '',
       ADMIN_EMAIL: '',

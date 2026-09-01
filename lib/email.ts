@@ -36,16 +36,41 @@ export interface OrderEmailData {
 // Web-safe stack — Outlook ignores `system-ui` and falls back to Times.
 const FONT = "Arial,'Helvetica Neue',Helvetica,sans-serif"
 
+let warnedNoCredentials = false
+
+// nodemailer's jsonTransport resolves sendMail() without opening a socket, so
+// the whole compose path still runs — templates rendered, both messages built —
+// while nothing dials smtp.gmail.com.
+function mockTransport() {
+  return nodemailer.createTransport({ jsonTransport: true })
+}
+
 function createTransport() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      // Gmail app passwords are shown in 4 space-separated groups for
-      // readability; the spaces aren't part of the secret — strip them.
-      pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ''),
-    },
-  })
+  const user = process.env.GMAIL_USER
+  // Gmail app passwords are shown in 4 space-separated groups for
+  // readability; the spaces aren't part of the secret — strip them.
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '')
+
+  // Set by the e2e server (playwright.config.ts). Every order-placing test
+  // would otherwise attempt a real Gmail login and fail auth, and repeated
+  // failed auth from one IP is how a sender gets flagged as a bot.
+  if (process.env.EMAIL_TRANSPORT === 'json') return mockTransport()
+
+  // Absent credentials are a misconfiguration in production — but dialling
+  // Gmail to discover that only burns more failed logins. Mock and say so
+  // instead. Either way the order is unaffected: sendOrderEmails is
+  // fire-and-forget by design (decision.md D5).
+  if (!user || !pass) {
+    if (!warnedNoCredentials) {
+      console.warn(
+        'GMAIL_USER / GMAIL_APP_PASSWORD are not set — order email is being mocked, not delivered.'
+      )
+      warnedNoCredentials = true
+    }
+    return mockTransport()
+  }
+
+  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
 }
 
 function itemsTable(items: OrderItem[]): string {
