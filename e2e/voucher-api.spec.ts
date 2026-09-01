@@ -10,7 +10,7 @@ import {
 
 const CUSTOMER = {
   firstName: 'Juan', lastName: 'dela Cruz', phone: '+63 912 345 6789',
-  province: 'Metro Manila', city: 'Pasig', barangay: 'Manggahan',
+  province: 'Metro Manila / NCR', city: 'Pasig', barangay: 'Manggahan',
   postalCode: '1611', address: '1611 KC-14', notes: '',
 }
 
@@ -18,12 +18,19 @@ const SLOTS = ['09-10', '13-14']
 const FLAT_SHIPPING = 99
 
 function orderPayload(over: Record<string, unknown> = {}) {
+  // `customer` is pulled out of the overrides before the final spread: leaving
+  // it in means `...over` puts the raw override back, throwing away the merged
+  // defaults. A caller passing `{ customer: { email } }` would then post a
+  // customer with no first/last name, and the order INSERT would fail on the
+  // NOT NULL columns — which reads as "the voucher rejected everyone" rather
+  // than as the payload bug it is.
+  const { customer, ...rest } = over
   return {
-    customer: { ...CUSTOMER, email: uniqueEmail('api'), ...(over.customer as object ?? {}) },
+    customer: { ...CUSTOMER, email: uniqueEmail('api'), ...(customer as object ?? {}) },
     items: [{ id: '7-shot', name: 'Aconchego Classic', shots: 7, price: 449, quantity: 1 }],
     subtotal: 449,
     deliverySlots: SLOTS,
-    ...over,
+    ...rest,
   }
 }
 

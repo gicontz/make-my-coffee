@@ -56,6 +56,20 @@ export async function addToCartViaShop(page: Page, productId: string, times = 1)
       await expect(page.getByRole('button', { name: 'Added!' })).toHaveCount(0, { timeout: 5_000 })
     }
   }
+
+  // What the next navigation actually reads is localStorage, so assert on that
+  // rather than on the button label — a click that lands mid-swap is silently
+  // dropped and would otherwise surface as a wrong subtotal much later.
+  await expect
+    .poll(async () =>
+      page.evaluate(id => {
+        const raw = window.localStorage.getItem('mmc-cart')
+        if (!raw) return 0
+        const lines = JSON.parse(raw) as { product: { id: string }; quantity: number }[]
+        return lines.filter(l => l.product.id === id).reduce((n, l) => n + l.quantity, 0)
+      }, productId)
+    )
+    .toBe(times)
 }
 
 /* ── Checkout ── */
@@ -81,7 +95,10 @@ export async function fillCheckout(page: Page, customer: CheckoutCustomer) {
   await page.locator('input[name="email"]').fill(customer.email)
   await page.locator('input[name="phone"]').fill(customer.phone ?? '+63 912 345 6789')
 
-  await page.locator('select[name="province"]').selectOption(customer.province ?? 'Metro Manila')
+  // Must match lib/phLocations.ts PROVINCES verbatim — the select has no
+  // plain 'Metro Manila' option, and selectOption fails silently-slowly
+  // ("did not find some options") until the test times out.
+  await page.locator('select[name="province"]').selectOption(customer.province ?? 'Metro Manila / NCR')
   await page.locator('select[name="city"]').selectOption(customer.city ?? 'Pasig')
   await page.locator('input[name="barangay"]').fill(customer.barangay ?? 'Manggahan')
   await page.locator('input[name="postalCode"]').fill(customer.postalCode ?? '1611')
@@ -93,9 +110,31 @@ export async function fillCheckout(page: Page, customer: CheckoutCustomer) {
   await page.getByRole('button', { name: '1:00 – 2:00 PM' }).click()
 }
 
+// Applies a code and waits for the check to *settle* before returning. The
+// page keeps the applied voucher in React state and only reads it when the
+// order is submitted, so returning while /api/vouchers/validate is still in
+// flight lets a following placeOrder() post `voucherCode: null` — the order
+// goes through at full price and the assertion failure points at the voucher
+// rules rather than at the race. Settled means the field has been replaced by
+// the applied chip, or an error line is showing.
 export async function applyVoucher(page: Page, code: string) {
   await page.getByLabel('Voucher Code').fill(code)
+  const settled = page.waitForResponse(r => r.url().includes('/api/vouchers/validate'))
   await page.getByRole('button', { name: 'Apply' }).click()
+  await settled
+  await expect
+    .poll(async () =>
+      (await page.getByRole('button', { name: 'Apply' }).count()) === 0 ||
+      (await voucherError(page).count()) > 0
+    )
+    .toBe(true)
+}
+
+// The voucher field's error line. Addressed by id rather than by role:
+// Next.js injects its own <div role="alert" id="__next-route-announcer__">
+// into every page, so getByRole('alert') is a strict-mode violation here.
+export function voucherError(page: Page) {
+  return page.locator('#voucher-error')
 }
 
 // The order summary is the sticky panel on the right; scoping to it keeps

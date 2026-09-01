@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test'
 import {
   addToCartViaShop, applyVoucher, fillCheckout, placeOrder, seedCart,
-  subtotalOf, summary, waitForQuote,
+  subtotalOf, summary, voucherError, waitForQuote,
 } from './helpers/app.ts'
 import {
   cleanup, countRedemptions, ensureSchema, getOrder, getVoucher, seedVoucher, sql, uniqueEmail,
@@ -27,11 +27,8 @@ test.afterAll(async () => {
   await cleanup()
 })
 
-test.beforeEach(async ({ page }) => {
-  await seedCart(page, CART)
-})
-
 test('percent voucher discounts the subtotal and the order records it', async ({ page }) => {
+  await seedCart(page, CART)
   const voucher = await seedVoucher({ code: 'E2EPERCENT20', discount_type: 'percent', discount_value: 20 })
   const email = uniqueEmail('percent')
 
@@ -63,6 +60,7 @@ test('percent voucher discounts the subtotal and the order records it', async ({
 })
 
 test('percent voucher never discounts more than its peso cap', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2ECAPPED', discount_type: 'percent', discount_value: 50, max_discount: 50 })
 
   await page.goto('/order')
@@ -79,6 +77,7 @@ test('percent voucher never discounts more than its peso cap', async ({ page }) 
 })
 
 test('fixed voucher larger than the cart discounts only down to zero', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2EBIGFIXED', discount_type: 'fixed', discount_value: 5000 })
 
   await page.goto('/order')
@@ -96,14 +95,15 @@ test('fixed voucher larger than the cart discounts only down to zero', async ({ 
 })
 
 test('free-delivery voucher waives shipping without touching the subtotal', async ({ page }) => {
-  await seedVoucher({ code: 'E2EFREESHIP', discount_type: 'free_shipping' })
+  await seedCart(page, CART)
+  await seedVoucher({ code: 'E2EWAIVEDELIVERY', discount_type: 'free_shipping' })
 
   await page.goto('/order')
   await fillCheckout(page, { email: uniqueEmail('freeship') })
   await waitForQuote(page)
   await expect(summary(page).getByText(`₱${FLAT_SHIPPING}`)).toBeVisible()
 
-  await applyVoucher(page, 'E2EFREESHIP')
+  await applyVoucher(page, 'E2EWAIVEDELIVERY')
 
   // The waived fee is struck through next to "Free".
   await expect(summary(page).getByText('Free')).toBeVisible()
@@ -116,22 +116,24 @@ test('free-delivery voucher waives shipping without touching the subtotal', asyn
   expect(order!.discount).toBe(0)
   expect(order!.shipping).toBe(0)
   expect(order!.total).toBe(SUBTOTAL)
-  expect(order!.voucher_code).toBe('E2EFREESHIP')
+  expect(order!.voucher_code).toBe('E2EWAIVEDELIVERY')
 })
 
 test('an unknown code is rejected without applying anything', async ({ page }) => {
+  await seedCart(page, CART)
   await page.goto('/order')
   await fillCheckout(page, { email: uniqueEmail('unknown') })
   await waitForQuote(page)
 
   await applyVoucher(page, 'E2ENOSUCHCODE')
 
-  await expect(page.getByRole('alert')).toHaveText(/isn’t valid/)
+  await expect(voucherError(page)).toHaveText(/isn’t valid/)
   await expect(summary(page).getByText('Voucher discount')).toHaveCount(0)
   await expect(summary(page).getByText(`₱${(SUBTOTAL + FLAT_SHIPPING).toLocaleString()}`)).toBeVisible()
 })
 
 test('a deactivated voucher is indistinguishable from a nonexistent one', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2EDISABLED', is_active: false })
 
   await page.goto('/order')
@@ -139,10 +141,11 @@ test('a deactivated voucher is indistinguishable from a nonexistent one', async 
   await waitForQuote(page)
   await applyVoucher(page, 'E2EDISABLED')
 
-  await expect(page.getByRole('alert')).toHaveText(/isn’t valid/)
+  await expect(voucherError(page)).toHaveText(/isn’t valid/)
 })
 
 test('a minimum-spend voucher explains how much more is needed', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2EMIN1000', min_subtotal: 1000 })
 
   await page.goto('/order')
@@ -150,10 +153,11 @@ test('a minimum-spend voucher explains how much more is needed', async ({ page }
   await waitForQuote(page)
   await applyVoucher(page, 'E2EMIN1000')
 
-  await expect(page.getByRole('alert')).toHaveText(new RegExp(`₱${(1000 - SUBTOTAL).toLocaleString()} more`))
+  await expect(voucherError(page)).toHaveText(new RegExp(`₱${(1000 - SUBTOTAL).toLocaleString()} more`))
 })
 
 test('an expired voucher is refused, a not-yet-started one too', async ({ page }) => {
+  await seedCart(page, CART)
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString()
   const hourAway = new Date(Date.now() + 3_600_000).toISOString()
   await seedVoucher({ code: 'E2EEXPIRED', expires_at: hourAgo })
@@ -164,13 +168,14 @@ test('an expired voucher is refused, a not-yet-started one too', async ({ page }
   await waitForQuote(page)
 
   await applyVoucher(page, 'E2EEXPIRED')
-  await expect(page.getByRole('alert')).toHaveText(/expired/)
+  await expect(voucherError(page)).toHaveText(/expired/)
 
   await applyVoucher(page, 'E2EFUTURE')
-  await expect(page.getByRole('alert')).toHaveText(/isn’t active yet/)
+  await expect(voucherError(page)).toHaveText(/isn’t active yet/)
 })
 
 test('a fully redeemed voucher is refused', async ({ page }) => {
+  await seedCart(page, CART)
   const voucher = await seedVoucher({ code: 'E2EUSEDUP', max_redemptions: 1 })
   // Pre-spend the only slot.
   await sql`UPDATE vouchers SET redemption_count = 1 WHERE id = ${voucher.id}`
@@ -180,11 +185,12 @@ test('a fully redeemed voucher is refused', async ({ page }) => {
   await waitForQuote(page)
   await applyVoucher(page, 'E2EUSEDUP')
 
-  await expect(page.getByRole('alert')).toHaveText(/fully redeemed/)
+  await expect(voucherError(page)).toHaveText(/fully redeemed/)
   expect((await getVoucher('E2EUSEDUP'))!.redemption_count).toBe(1)
 })
 
 test('a one-per-customer voucher is refused on the same email a second time', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2EONCE', discount_type: 'fixed', discount_value: 50, once_per_email: true })
   const email = uniqueEmail('once')
 
@@ -201,7 +207,7 @@ test('a one-per-customer voucher is refused on the same email a second time', as
   await waitForQuote(page)
   await applyVoucher(page, 'E2EONCE')
 
-  await expect(page.getByRole('alert')).toHaveText(/already used this voucher/)
+  await expect(voucherError(page)).toHaveText(/already used this voucher/)
 
   // A different customer can still redeem it.
   await seedCart(page, CART)
@@ -209,10 +215,11 @@ test('a one-per-customer voucher is refused on the same email a second time', as
   await fillCheckout(page, { email: uniqueEmail('once-other') })
   await waitForQuote(page)
   await applyVoucher(page, 'E2EONCE')
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(voucherError(page)).toHaveCount(0)
 })
 
 test('the customer can remove an applied voucher and the total reverts', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2EREMOVE', discount_type: 'fixed', discount_value: 100 })
 
   await page.goto('/order')
@@ -234,6 +241,7 @@ test('the customer can remove an applied voucher and the total reverts', async (
 })
 
 test('codes are matched case- and whitespace-insensitively', async ({ page }) => {
+  await seedCart(page, CART)
   await seedVoucher({ code: 'E2ECASE', discount_type: 'fixed', discount_value: 75 })
 
   await page.goto('/order')
@@ -250,13 +258,15 @@ test('full journey: shop → cart → checkout with a voucher', async ({ page })
   const email = uniqueEmail('journey')
 
   // This spec drives the catalog itself rather than seeding localStorage, so
-  // the whole path is covered once end to end.
-  await page.addInitScript(() => window.localStorage.removeItem('mmc-cart'))
+  // the whole path is covered once end to end. It is deliberately the one test
+  // that does not call seedCart: a fresh context means localStorage starts
+  // empty, and clearing it via addInitScript would re-run on every navigation
+  // and wipe the cart again on the way to /cart.
   await page.goto('/shop')
   await addToCartViaShop(page, '7-shot', 2)
 
   await page.goto('/cart')
-  await expect(page.getByText('Aconchego Classic')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Aconchego Classic' })).toBeVisible()
   await page.getByRole('link', { name: /Proceed to Checkout/ }).click()
   await page.waitForURL('**/order')
 
