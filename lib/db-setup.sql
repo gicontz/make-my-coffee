@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS orders (
   voucher_code   TEXT NOT NULL DEFAULT '',
   payment_method TEXT NOT NULL DEFAULT 'cod',
   payment_status TEXT NOT NULL DEFAULT 'unpaid',
+  paid_at        TIMESTAMPTZ,
   order_status   TEXT NOT NULL DEFAULT 'pending',
   delivery_slots TEXT[] NOT NULL DEFAULT '{}',
   shipping_source TEXT NOT NULL DEFAULT 'flat',
@@ -31,9 +32,9 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 -- Applied to the live DB via lib/migrations/0001_add_delivery_slots.sql,
--- 0002_add_shipping_source.sql, 0003_add_barangay_and_pin.sql and
--- 0004_add_vouchers.sql; included here too so a fresh setup doesn't need the
--- migrations separately.
+-- 0002_add_shipping_source.sql, 0003_add_barangay_and_pin.sql,
+-- 0004_add_vouchers.sql and 0005_add_paid_at.sql; included here too so a
+-- fresh setup doesn't need the migrations separately.
 
 CREATE INDEX IF NOT EXISTS orders_order_status_idx  ON orders (order_status);
 CREATE INDEX IF NOT EXISTS orders_created_at_idx    ON orders (created_at DESC);
@@ -84,3 +85,11 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS voucher_id   INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS voucher_code TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS discount     INTEGER NOT NULL DEFAULT 0;
+
+-- 0005_add_paid_at — the CREATE TABLE above already has this column for a
+-- fresh setup; this ALTER retrofits it onto a database that had the table
+-- before 0005 (the live DB, and any Neon branch of it — e2e's included).
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+
+UPDATE orders SET paid_at = created_at WHERE payment_status = 'paid' AND paid_at IS NULL;
