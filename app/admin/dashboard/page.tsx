@@ -30,11 +30,42 @@ export default async function Dashboard() {
     return null
   })
 
+  // Revenue cards show COLLECTED money only — paid, non-cancelled orders (see
+  // lib/stats.ts). Everything else that was ordered but not yet paid for is
+  // still surfaced, as a `note` under the figure, so an empty revenue card
+  // never reads as "no activity" when the real story is "nothing paid yet".
+  const peso = (n: number) => `₱${n.toLocaleString()}`
+
   const statCards = [
-    { label: "Today's Orders",   value: stats?.today.orders ?? '—',               sub: 'new today' },
-    { label: "Today's Revenue",  value: stats ? `₱${stats.today.revenue.toLocaleString()}` : '—', sub: 'collected today' },
-    { label: 'Pending Orders',   value: stats?.pendingCount ?? '—',                sub: 'placed, not yet delivered or cancelled' },
-    { label: 'Total Revenue',    value: stats ? `₱${stats.all.revenue.toLocaleString()}` : '—',   sub: 'all time' },
+    {
+      label: "Today's Orders",
+      value: stats?.today.orders ?? '—',
+      sub: 'placed today',
+      note: stats?.today.cancelled ? `${stats.today.cancelled} cancelled` : null,
+    },
+    {
+      label: "Today's Revenue",
+      value: stats ? peso(stats.today.revenue) : '—',
+      sub: 'collected — paid orders only',
+      note: stats?.today.uncollected ? `${peso(stats.today.uncollected)} not yet paid` : null,
+    },
+    {
+      label: 'Open Orders',
+      value: stats?.pendingCount ?? '—',
+      sub: 'placed, not yet delivered or cancelled',
+      note: null,
+    },
+    {
+      label: 'Total Revenue',
+      value: stats ? peso(stats.all.revenue) : '—',
+      sub: 'all time — paid orders only',
+      note: stats
+        ? [
+            stats.all.uncollected ? `${peso(stats.all.uncollected)} unpaid` : null,
+            stats.all.cancelled ? `${peso(stats.all.cancelledValue)} cancelled` : null,
+          ].filter(Boolean).join(' · ') || null
+        : null,
+    },
   ]
 
   const breakdownMap = new Map((stats?.statusBreakdown ?? []).map(s => [s.order_status, s.count]))
@@ -59,9 +90,26 @@ export default async function Dashboard() {
             <p className="text-espresso-500 text-xs font-semibold uppercase tracking-wider mb-2">{card.label}</p>
             <p className="text-espresso-900 text-3xl font-bold" style={{ fontFamily: 'Georgia, serif' }}>{card.value}</p>
             <p className="text-espresso-400 text-xs mt-1">{card.sub}</p>
+            {card.note && <p className="text-espresso-500 text-xs mt-1.5 font-medium">{card.note}</p>}
           </div>
         ))}
       </div>
+
+      {/* COD money that should already be in hand: delivered, still marked unpaid.
+          Without this the corrected revenue cards would just read ₱0 with no
+          explanation of where the missing cash went. */}
+      {stats && stats.awaitingCollection.count > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-5 py-4 text-sm flex items-center justify-between gap-4">
+          <p>
+            <span className="font-semibold">{peso(stats.awaitingCollection.value)}</span> across{' '}
+            {stats.awaitingCollection.count} delivered {stats.awaitingCollection.count === 1 ? 'order is' : 'orders are'}{' '}
+            still marked unpaid — it won't count as revenue until it's marked paid.
+          </p>
+          <Link href="/admin/orders" className="shrink-0 font-semibold underline underline-offset-2 hover:text-amber-700">
+            Review →
+          </Link>
+        </div>
+      )}
 
       {/* Status breakdown — the "Pending" card above is a single open/not-concluded
           count; this row shows exactly which stage each open order is sitting in. */}
@@ -84,7 +132,8 @@ export default async function Dashboard() {
 
       {/* Chart */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-espresso-100 mb-8">
-        <h2 className="text-espresso-900 font-bold mb-6" style={{ fontFamily: 'Georgia, serif' }}>Last 7 Days — Orders &amp; Revenue</h2>
+        <h2 className="text-espresso-900 font-bold" style={{ fontFamily: 'Georgia, serif' }}>Last 7 Days — Orders &amp; Revenue</h2>
+        <p className="text-espresso-400 text-xs mt-1 mb-6">Manila days. Revenue counts paid, non-cancelled orders; uncollected is ordered but not yet paid.</p>
         {stats?.daily ? <SalesChart data={stats.daily} /> : (
           <p className="text-espresso-400 text-sm text-center py-16">No data yet — connect the database to see charts.</p>
         )}
@@ -103,7 +152,7 @@ export default async function Dashboard() {
             <table className="w-full text-sm">
               <thead className="bg-espresso-50">
                 <tr>
-                  {['#', 'Customer', 'City', 'Total', 'Status', 'Date'].map(h => (
+                  {['#', 'Customer', 'City', 'Total', 'Status', 'Payment', 'Date'].map(h => (
                     <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-espresso-500 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -111,7 +160,7 @@ export default async function Dashboard() {
               <tbody className="divide-y divide-espresso-50">
                 {stats.recentOrders.map((o: {
                   id: number; first_name: string; last_name: string; city: string;
-                  total: number; order_status: string; created_at: string
+                  total: number; order_status: string; payment_status: string; created_at: string
                 }) => (
                   <tr key={o.id} className="hover:bg-espresso-50/50 transition-colors">
                     <td className="px-5 py-3 font-mono text-espresso-400 text-xs">#{o.id}</td>
@@ -121,6 +170,13 @@ export default async function Dashboard() {
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[o.order_status] ?? 'bg-gray-100 text-gray-700'}`}>
                         {o.order_status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        o.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-espresso-100 text-espresso-600'
+                      }`}>
+                        {o.payment_status}
                       </span>
                     </td>
                     <td className="px-5 py-3 text-espresso-400 text-xs">

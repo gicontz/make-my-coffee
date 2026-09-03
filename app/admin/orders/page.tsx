@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { slotLabel } from '@/lib/deliverySlots'
+import { PAYMENT_METHODS, paymentMethodLabel } from '@/lib/paymentMethods'
 
 interface Order {
   id: number
@@ -26,6 +27,7 @@ interface Order {
   total: number
   order_status: string
   payment_status: string
+  payment_method: string
   notes: string
   delivery_slots: string[]
   created_at: string
@@ -69,6 +71,10 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<number | null>(null)
+  // Which order's "Mark Paid" method picker is open, if any — at most one at
+  // a time, so an order id is enough (no per-card boolean map needed).
+  const [payMenuOpenId, setPayMenuOpenId] = useState<number | null>(null)
+  const payMenuRef = useRef<HTMLDivElement>(null)
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -90,7 +96,20 @@ export default function AdminOrders() {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  async function updateStatus(id: number, patch: { order_status?: string; payment_status?: string }) {
+  // Closes the payment-method picker on an outside click, same as any
+  // dropdown — otherwise it stays open while the admin works another card.
+  useEffect(() => {
+    if (payMenuOpenId === null) return
+    function onClick(e: MouseEvent) {
+      if (payMenuRef.current && !payMenuRef.current.contains(e.target as Node)) {
+        setPayMenuOpenId(null)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [payMenuOpenId])
+
+  async function updateStatus(id: number, patch: { order_status?: string; payment_status?: string; payment_method?: string }) {
     setUpdating(id)
     await fetch(`/api/admin/orders/${id}`, {
       method: 'PATCH',
@@ -99,6 +118,15 @@ export default function AdminOrders() {
     })
     await fetchOrders()
     setUpdating(null)
+  }
+
+  // Marking paid needs a method (see app/api/admin/orders/[id]/route.ts —
+  // there's no live payment gateway, so a COD order can still be settled via
+  // GCash, Maya or a bank transfer once the admin actually reaches the
+  // customer); marking unpaid is a plain toggle, no method to ask for.
+  async function markPaid(id: number, payment_method: string) {
+    setPayMenuOpenId(null)
+    await updateStatus(id, { payment_status: 'paid', payment_method })
   }
 
   return (
@@ -161,7 +189,7 @@ export default function AdminOrders() {
                       {oStatus?.label}
                     </span>
                     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${pStatus?.color}`}>
-                      {pStatus?.label}
+                      {pStatus?.label}{order.payment_status === 'paid' ? ` · ${paymentMethodLabel(order.payment_method)}` : ''}
                     </span>
                     <span className="text-espresso-400 text-xs">
                       {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -265,15 +293,41 @@ export default function AdminOrders() {
                       {isUpdating ? '…' : action.label}
                     </button>
                   ))}
-                  <button
-                    disabled={isUpdating}
-                    onClick={() => updateStatus(order.id, {
-                      payment_status: order.payment_status === 'unpaid' ? 'paid' : 'unpaid',
-                    })}
-                    className="px-4 py-1.5 rounded-full text-xs font-bold bg-espresso-100 hover:bg-espresso-200 text-espresso-700 transition-colors disabled:opacity-50 ml-auto"
-                  >
-                    {isUpdating ? '…' : order.payment_status === 'unpaid' ? 'Mark Paid' : 'Mark Unpaid'}
-                  </button>
+                  {order.payment_status === 'unpaid' ? (
+                    <div className="relative ml-auto" ref={payMenuOpenId === order.id ? payMenuRef : undefined}>
+                      <button
+                        disabled={isUpdating}
+                        onClick={() => setPayMenuOpenId(open => (open === order.id ? null : order.id))}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold bg-espresso-100 hover:bg-espresso-200 text-espresso-700 transition-colors disabled:opacity-50"
+                      >
+                        {isUpdating ? '…' : 'Mark Paid'}
+                      </button>
+                      {payMenuOpenId === order.id && (
+                        <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-xl shadow-lg border border-espresso-100 py-1.5 z-10">
+                          <p className="px-3 pb-1.5 mb-0.5 text-[10px] font-semibold text-espresso-400 uppercase tracking-wider border-b border-espresso-50">
+                            Paid via
+                          </p>
+                          {PAYMENT_METHODS.map(method => (
+                            <button
+                              key={method.value}
+                              onClick={() => markPaid(order.id, method.value)}
+                              className="w-full text-left px-3 py-1.5 text-sm text-espresso-700 hover:bg-espresso-50 transition-colors"
+                            >
+                              {method.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => updateStatus(order.id, { payment_status: 'unpaid' })}
+                      className="px-4 py-1.5 rounded-full text-xs font-bold bg-espresso-100 hover:bg-espresso-200 text-espresso-700 transition-colors disabled:opacity-50 ml-auto"
+                    >
+                      {isUpdating ? '…' : 'Mark Unpaid'}
+                    </button>
+                  )}
                 </div>
               </div>
             )

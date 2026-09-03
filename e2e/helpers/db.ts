@@ -134,6 +134,56 @@ export interface OrderRow {
   voucher_code: string
   voucher_id: number | null
   items: { id: string; name: string; price: number; quantity: number }[]
+  order_status: string
+  payment_status: string
+  payment_method: string
+  paid_at: string | null
+}
+
+// Inserts an order in a known state, for specs that assert on aggregates
+// (dashboard stats) rather than on the checkout flow. `createdAt` is what makes
+// the Asia/Manila day-boundary testable: pass an instant that is today in
+// Manila but yesterday in UTC and the stats must still file it under today.
+export interface SeedOrder {
+  total: number
+  order_status?: 'pending' | 'approved' | 'shipped' | 'delivered' | 'cancelled'
+  payment_status?: 'unpaid' | 'paid'
+  payment_method?: string
+  createdAt?: Date | string
+  // Only meaningful when payment_status is 'paid'. Defaults to createdAt (or
+  // now, if createdAt is also unset) — mirrors the real PATCH handler, which
+  // stamps paid_at the moment payment_status flips to 'paid'. Set explicitly
+  // to seed an order paid on a different Manila day than it was placed.
+  paidAt?: Date | string
+  email?: string
+}
+
+export async function seedOrder(o: SeedOrder): Promise<number> {
+  const email = o.email ?? uniqueEmail('stats')
+  if (!email.endsWith('@' + EMAIL_DOMAIN)) {
+    throw new Error(`e2e order emails must end in @${EMAIL_DOMAIN} so cleanup can find them (got ${email})`)
+  }
+
+  const items = JSON.stringify([{ id: '7-shot', name: 'Aconchego Classic', price: o.total, quantity: 1 }])
+  const createdAt = o.createdAt ? new Date(o.createdAt).toISOString() : null
+  const paidAt = o.payment_status === 'paid'
+    ? new Date(o.paidAt ?? o.createdAt ?? Date.now()).toISOString()
+    : null
+
+  const rows = (await sql`
+    INSERT INTO orders (
+      first_name, last_name, email, items, subtotal, total,
+      order_status, payment_status, payment_method, paid_at, created_at
+    ) VALUES (
+      'E2E', 'Fixture', ${email}, ${items}::jsonb, ${o.total}, ${o.total},
+      ${o.order_status ?? 'pending'}, ${o.payment_status ?? 'unpaid'}, ${o.payment_method ?? 'cod'},
+      ${paidAt}::timestamptz,
+      COALESCE(${createdAt}::timestamptz, NOW())
+    )
+    RETURNING id
+  `) as { id: number }[]
+
+  return rows[0].id
 }
 
 export async function getOrder(id: number): Promise<OrderRow | null> {
