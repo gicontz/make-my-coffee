@@ -106,8 +106,8 @@ Until step 4 passes, leave `RESEND_API_KEY` unset — sends against an unverifie
 domain are rejected outright, and the Gmail fallback keeps working meanwhile.
 
 ## Messenger chat + bot
-Meta's Chat Plugin on the storefront, plus a webhook-backed bot. Issue #11 has
-the full credential walkthrough; this is the shape of it.
+An m.me chat launcher on the storefront, plus a webhook-backed bot. Issue #11
+has the full credential walkthrough; this is the shape of it.
 
 | Piece | File | Gated on |
 |---|---|---|
