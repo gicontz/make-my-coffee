@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { sendAdminNotice } from '@/lib/email'
 import { assistantReply } from '@/lib/messenger/assistant'
 import {
@@ -59,10 +60,25 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Bad Request', { status: 400 })
   }
 
-  // Meta ignores the body of a 200 and retries anything else. Work happens
-  // before responding because this runs on serverless — there is no "after the
-  // response" to defer to on Next 14 — so every handler below is bounded and
-  // every failure is swallowed into a log rather than a non-200.
+  // Meta requires a 200 within **5 seconds**, and unsubscribes the app
+  // entirely after an hour of failures. A Claude call does not fit in that
+  // budget, so the reply is acknowledged first and the work runs after.
+  //
+  // waitUntil is the Vercel primitive that keeps the function alive past the
+  // response (Next 14 has no `after()` — that arrived in 15). Off Vercel it
+  // isn't available, and there the process stays alive on its own, so a throw
+  // here is not a failure.
+  const work = handleEvents(payload)
+  try {
+    waitUntil(work)
+  } catch {
+    // Not running on Vercel — local dev, or a self-hosted node server.
+  }
+
+  return NextResponse.json({ received: true })
+}
+
+async function handleEvents(payload: MessengerWebhookBody): Promise<void> {
   try {
     for (const entry of payload.entry ?? []) {
       for (const event of entry.messaging ?? []) {
@@ -72,10 +88,10 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (err) {
+    // Nothing below the ack may reject: the response has already gone, and an
+    // unhandled rejection takes the whole function down with it.
     console.error('messenger: webhook body was not shaped as expected:', err)
   }
-
-  return NextResponse.json({ received: true })
 }
 
 async function handleEvent(event: MessagingEvent): Promise<void> {

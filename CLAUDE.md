@@ -142,6 +142,12 @@ Meta retries deliveries, so every message id is claimed in `messenger_events`
 before it is answered — an in-memory guard cannot work when two deliveries land
 in two serverless instances.
 
+**Meta requires a 200 within 5 seconds** and unsubscribes the app after an hour
+of failures, so the webhook acks first and does the work in `waitUntil`
+(`@vercel/functions` — Next 14 has no `after()`). Nothing after the ack may
+reject: the response has already gone, and an unhandled rejection takes the
+function down.
+
 ### Deploy order
 1. Merge and deploy — the route answers Meta's `GET` challenge. **Meta will not
    save a callback URL until it does**, so the code must ship before the webhook
