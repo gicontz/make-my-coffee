@@ -102,6 +102,49 @@ triggered it.
 Until step 4 passes, leave `RESEND_API_KEY` unset — sends against an unverified
 domain are rejected outright, and the Gmail fallback keeps working meanwhile.
 
+## Messenger chat + bot
+Meta's Chat Plugin on the storefront, plus a webhook-backed bot. Issue #11 has
+the full credential walkthrough; this is the shape of it.
+
+| Piece | File | Gated on |
+|---|---|---|
+| Chat bubble | `components/MessengerChat.tsx` | `NEXT_PUBLIC_FB_PAGE_ID` |
+| Webhook | `app/api/messenger/webhook/route.ts` | `FB_APP_SECRET`, `FB_VERIFY_TOKEN` |
+| Replies out | `lib/messenger/send.ts` | `FB_PAGE_ACCESS_TOKEN` |
+| Buttons + parsing (pure) | `lib/messenger/conversation.ts` | — |
+| Order lookup + dedupe | `lib/messenger/store.ts` | migration 0006 |
+| Free-text answers | `lib/messenger/assistant.ts` | `ANTHROPIC_API_KEY` |
+
+Each is independently dark without its variable: no Page ID, no bubble and no
+Facebook SDK fetched; no Anthropic key, the bot still answers with buttons.
+
+**The bubble is hidden on `/order` and `/admin`** — a floating bubble sits
+exactly where the Place Order button is on a phone.
+
+**Order lookups need an order number *and* the email on that order.**
+`orders.id` is a SERIAL, so a lookup on the number alone would let anyone walk
+the table. Failures are rate-limited per PSID (`lib/messenger/rateLimit.ts`),
+and a match returns status, window, total and paid/unpaid only — never the
+address or phone.
+
+**Nothing the bot does marks an order paid.** A payment screenshot emails the
+admin and is acknowledged; a human still confirms it (D13).
+
+Meta retries deliveries, so every message id is claimed in `messenger_events`
+before it is answered — an in-memory guard cannot work when two deliveries land
+in two serverless instances.
+
+### Deploy order
+1. Merge and deploy — the route answers Meta's `GET` challenge. **Meta will not
+   save a callback URL until it does**, so the code must ship before the webhook
+   can be configured. Use a preview deployment.
+2. Configure the webhook in the Meta app, subscribing the Page to `messages`,
+   `messaging_postbacks`, `messaging_optins`, `messaging_referrals`.
+3. Allowlist the domain in Business Suite, or the bubble renders nothing and
+   logs nothing useful.
+4. App Review for `pages_messaging` + Business Verification before the bot can
+   talk to anyone who isn't an admin/developer/tester on the app.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`

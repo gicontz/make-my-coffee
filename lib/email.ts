@@ -551,3 +551,22 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
     `),
   })
 }
+
+/**
+ * A plain internal note to the shop. No customer ever sees these, so they get
+ * the same chrome as everything else but none of the order furniture.
+ *
+ * Used by the Messenger webhook: a payment screenshot arriving in chat is
+ * money-adjacent, and the Page inbox is not somewhere anyone watches all day.
+ */
+export async function sendAdminNotice(subject: string, body: string) {
+  await deliver({
+    to: process.env.ADMIN_EMAIL ?? '',
+    bcc: staffBcc(),
+    subject,
+    html: base(`
+      <h2 style="margin:0 0 16px;font-family:${FONT};color:#1C0A00;font-size:20px;">${subject}</h2>
+      <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:15px;white-space:pre-line;">${body}</p>
+    `),
+  })
+}
