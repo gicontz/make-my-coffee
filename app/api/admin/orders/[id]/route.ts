@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { isPaymentMethod } from '@/lib/paymentMethods'
+import { notifiesCustomer, sendOrderStatusEmail, statusEmailFromOrderRow } from '@/lib/email'
 
 const VALID_ORDER_STATUSES = ['pending', 'approved', 'shipped', 'delivered', 'cancelled']
 const VALID_PAYMENT_STATUSES = ['unpaid', 'paid']
@@ -16,9 +17,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (!VALID_ORDER_STATUSES.includes(order_status)) {
       return NextResponse.json({ error: 'Invalid order_status' }, { status: 400 })
     }
-    await sql`
-      UPDATE orders SET order_status = ${order_status}, updated_at = NOW() WHERE id = ${id}
+    // `AND order_status <> ...` makes this a real transition or nothing at all.
+    // Without it, re-clicking "Mark Shipped" (or a retried request, or two
+    // admins on the same card) would mail the customer again each time — the
+    // UPDATE would happily rewrite the same value and report success. An empty
+    // RETURNING is the signal that nothing changed.
+    const changed = await sql`
+      UPDATE orders SET order_status = ${order_status}, updated_at = NOW()
+      WHERE id = ${id} AND order_status <> ${order_status}
+      RETURNING *
     `
+
+    // Fire-and-forget, same discipline as the order confirmation (D5): a mail
+    // provider having a bad day must not make the admin think the status
+    // update failed, because it didn't — it's already committed above.
+    if (changed.length && notifiesCustomer(order_status)) {
+      await sendOrderStatusEmail(statusEmailFromOrderRow(changed[0], order_status))
+        .catch(err => console.error(`Status email failed for order ${id} (${order_status}):`, err))
+    }
   }
 
   if (payment_status !== undefined) {

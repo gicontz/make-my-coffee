@@ -63,6 +63,45 @@ its header before adding a method. QR images are in `public/qr/` (stable URLs �
 the confirmation email embeds them); sources and the regeneration recipe are in
 `app/assets/qr/README.md`.
 
+## Email
+Three transactional emails, all built in `lib/email.ts`:
+
+| When | To | Function |
+|---|---|---|
+| Order placed | admin + customer | `sendOrderEmails()` |
+| Status → `shipped` | customer | `sendOrderStatusEmail()` |
+| Status → `delivered` | customer | `sendOrderStatusEmail()` |
+
+`approved` and `cancelled` deliberately send nothing — see the comment on
+`NOTIFIED_ORDER_STATUSES`. Status mail fires from `PATCH /api/admin/orders/[id]`
+only on a **real** transition: the UPDATE carries `AND order_status <> …`, so a
+re-clicked button writes nothing and therefore mails nothing.
+
+Delivery picks a route per call, in this order: `EMAIL_TRANSPORT=json` (mocked —
+what the e2e suite runs with, checked first so a stray API key can never mail
+real customers), then `RESEND_API_KEY`, then Gmail, then mocked-with-a-warning.
+Mail is fire-and-forget (D5) — a provider outage never fails the request that
+triggered it.
+
+### Setting up Resend for makemycoffee.cafe
+1. resend.com → Domains → Add Domain. Use a **subdomain** — `mail.makemycoffee.cafe`
+   or `updates.makemycoffee.cafe` — so a bad send can't damage the root domain's
+   reputation.
+2. Resend shows the exact DNS records to add (an SPF `TXT`, DKIM, and a `MX` for
+   the sending subdomain). Copy them verbatim; don't reconstruct them from memory.
+3. Add them at whoever actually hosts the DNS for `makemycoffee.cafe` — **check
+   this first.** Registrar and DNS host are often not the same company, and
+   editing records in the wrong dashboard looks like it worked and changes
+   nothing.
+4. Wait for Verified in Resend, then add a DMARC record (`_dmarc`, start at
+   `p=none`) once mail is flowing.
+5. API Keys → Create, with **Sending access** only. Put it in Vercel env for
+   Production and Preview, and set `MAIL_FROM` to an address on the verified
+   subdomain.
+
+Until step 4 passes, leave `RESEND_API_KEY` unset — sends against an unverified
+domain are rejected outright, and the Gmail fallback keeps working meanwhile.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
