@@ -6,14 +6,33 @@ import { validateDeliverySlots } from '@/lib/deliverySlots'
 import { priceOrderItems } from '@/lib/products'
 import { applyVoucher, type AppliedVoucher } from '@/lib/vouchers'
 import { attachOrder, claimVoucher, findVoucherByCode, releaseVoucher } from '@/lib/voucherStore'
+import { DEFAULT_PAYMENT_METHOD, isCheckoutPaymentMethod } from '@/lib/paymentMethods'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { customer, items, deliverySlots, voucherCode } = body
+    const { customer, items, deliverySlots, voucherCode, paymentMethod } = body
 
     if (!customer) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+    }
+
+    // How the customer *intends* to pay. Recorded, never trusted: none of the
+    // QR wallets can be verified (decision.md D13), so this says nothing about
+    // whether money moved — the order is inserted 'unpaid' either way and only
+    // an admin marking it paid changes that. A client-supplied payment_status
+    // is ignored outright; there's no code path here that can set it.
+    //
+    // Absent means an older client that predates the picker, so it falls back
+    // to COD. Present but not a checkout method (a tampered request, or the
+    // admin-only 'bank_transfer') is a 400 rather than a silent fallback —
+    // same discipline as the slot and cart validation below.
+    let method: string = DEFAULT_PAYMENT_METHOD
+    if (paymentMethod !== undefined && paymentMethod !== null) {
+      if (!isCheckoutPaymentMethod(paymentMethod)) {
+        return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
+      }
+      method = paymentMethod
     }
 
     // Every peso on this order is derived from lib/products.ts, never from the
@@ -98,7 +117,7 @@ export async function POST(request: NextRequest) {
           ${customer.address ?? ''}, ${customer.barangay ?? ''}, ${customer.city ?? ''}, ${customer.province ?? ''}, ${customer.postalCode ?? ''}, ${customer.notes ?? ''},
           ${JSON.stringify(pricedItems)}, ${subtotal}, ${discount}, ${shipping}, ${total},
           ${voucherId}, ${applied?.code ?? ''},
-          'cod', 'unpaid', 'pending',
+          ${method}, 'unpaid', 'pending',
           ${deliverySlots}, ${shippingQuote.source}, ${shippingQuote.distanceKm},
           ${customer.lat ?? null}, ${customer.lng ?? null}
         )
@@ -125,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     await sendOrderEmails({
       orderId, customer, items: pricedItems, subtotal, discount, shipping, total,
-      deliverySlots, voucher: applied,
+      deliverySlots, voucher: applied, paymentMethod: method,
     }).catch(err => console.error('Email send failed:', err))
 
     return NextResponse.json({ orderId })

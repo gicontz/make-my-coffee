@@ -23,7 +23,7 @@ npm start
 | `/` | `app/page.tsx` | Landing page — server component |
 | `/shop` | `app/shop/page.tsx` | 3 product cards, add to cart |
 | `/cart` | `app/cart/page.tsx` | Cart view with qty controls |
-| `/order` | `app/order/page.tsx` | Checkout form + PayPal placeholder |
+| `/order` | `app/order/page.tsx` | Checkout form + payment method picker (COD / QR) |
 
 ## Key files
 - `lib/products.ts` — single source of truth for product data and the `Product` type
@@ -41,15 +41,30 @@ Headings use `style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}` in
 
 ## Products
 Defined in `lib/products.ts` — do not duplicate elsewhere:
-- **Aconchego Starter** — 4 shots / 120ml / $8.99
-- **Aconchego Classic** — 7 shots / 210ml / $14.99 (Most Popular)
-- **Aconchego Reserve** — 10 shots / 300ml / $19.99 (Best Value)
+- **Aconchego Starter** — 4 shots / 120ml / ₱299
+- **Aconchego Classic** — 7 shots / 210ml / ₱449 (Most Popular)
+- **Aconchego Reserve** — 10 shots / 300ml / ₱599 (Best Value)
 
 ## Backend / payment
-**Not implemented yet.** PayPal is the planned payment provider. The order page collects form data and shows a PayPal placeholder. Discuss implementation before touching payment code.
+**No online gateway, by decision** (`memory/decision.md` D2, D13) — PayPal was planned and never built.
+
+Checkout offers Cash on Delivery, GCash, Maya and GoTyme Bank. The wallets are
+**display-only**: `/order` shows that account's QR from `public/qr/`, the customer
+pays in their own app, and the order is inserted `payment_status = 'unpaid'`
+regardless of method. Nothing verifies a payment — there is no merchant API for
+any of the three — so an admin confirms every one by hand with Mark Paid, which
+is the only thing that ever sets `paid`/`paid_at`.
+
+`payment_method` on an unpaid order is what the customer *intends*, not what
+happened. Don't read it as evidence of payment.
+
+`lib/paymentMethods.ts` holds both method lists and the QR account table; read
+its header before adding a method. QR images are in `public/qr/` (stable URLs —
+the confirmation email embeds them); sources and the regeneration recipe are in
+`app/assets/qr/README.md`.
 
 ## Conventions
-- No API calls yet — all state is frontend only
+- Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
-- Shipping is free above $30; otherwise $4.99
-- Currency is USD (`$`) for now
+- Shipping: flat ₱99, free only for Pasig City orders ≥ ₱1,000 (`lib/shipping.ts`)
+- Currency is PHP (`₱`), integer pesos — no cents (D1)

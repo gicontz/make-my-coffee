@@ -10,6 +10,10 @@ import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
 import { isValidCode, normalizeCode, type AppliedVoucher } from '@/lib/vouchers'
+import {
+  CHECKOUT_PAYMENT_METHODS, DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor,
+  type CheckoutPaymentMethod,
+} from '@/lib/paymentMethods'
 import type { LatLng, SuggestionPrecision } from '@/components/DeliveryMapPicker'
 
 // Leaflet needs `window` — load client-only, no SSR.
@@ -43,6 +47,11 @@ export default function OrderPage() {
   const { items, total, clearCart } = useCart()
   const [form, setForm] = useState<Form>(INITIAL_FORM)
   const [deliverySlots, setDeliverySlots] = useState<string[]>([])
+  // How the customer says they'll pay. Display-only: choosing GCash/Maya/GoTyme
+  // shows that account's QR and nothing more — no gateway, no verification, and
+  // Place Order stays enabled throughout (decision.md D13). The server records
+  // it alongside the order, still unpaid, for an admin to confirm by hand.
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>(DEFAULT_PAYMENT_METHOD)
   const [orderId, setOrderId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -251,6 +260,7 @@ export default function OrderPage() {
           subtotal: total,
           deliverySlots,
           voucherCode: voucher?.code ?? null,
+          paymentMethod,
         }),
       })
       const data = await res.json()
@@ -267,6 +277,9 @@ export default function OrderPage() {
 
   /* ── Success ── */
   if (orderId) {
+    // The highest-intent moment to actually pay is right now, so a QR customer
+    // gets the code again here rather than only in the email.
+    const placedAccount = qrAccountFor(paymentMethod)
     return (
       <div className="min-h-screen bg-espresso-50 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
@@ -290,9 +303,36 @@ export default function OrderPage() {
               </span>
             </p>
           )}
-          <p className="text-espresso-400 text-sm mb-8">
-            Payment is <strong>Cash on Delivery</strong>. Please have ₱{placedTotal.toLocaleString()} ready when your order arrives.
-          </p>
+          {placedAccount ? (
+            <div className="bg-white border border-espresso-200 rounded-2xl p-5 mt-6 mb-8">
+              <p className="text-espresso-900 font-bold">
+                Pay ₱{placedTotal.toLocaleString()} with {placedAccount.label}
+              </p>
+              <p className="text-espresso-500 text-xs mb-4">
+                Scan below, then send us a screenshot quoting order #{orderId}.
+              </p>
+              <div className="flex justify-center mb-4">
+                <Image
+                  src={placedAccount.image}
+                  alt={`${placedAccount.label} QR code for ${placedAccount.accountName}`}
+                  width={placedAccount.width}
+                  height={placedAccount.height}
+                  className="w-[200px] h-auto rounded-lg border border-espresso-200"
+                />
+              </div>
+              <p className="text-espresso-900 font-semibold text-sm">{placedAccount.accountName}</p>
+              <p className="text-espresso-500 text-xs">
+                {placedAccount.accountRefLabel}: <span className="font-mono">{placedAccount.accountRef}</span>
+              </p>
+              <p className="text-espresso-400 text-xs mt-3">
+                The same QR is in your confirmation email — your order is already placed, so there&apos;s no rush.
+              </p>
+            </div>
+          ) : (
+            <p className="text-espresso-400 text-sm mb-8">
+              Payment is <strong>Cash on Delivery</strong>. Please have ₱{placedTotal.toLocaleString()} ready when your order arrives.
+            </p>
+          )}
           <Link href="/" className="inline-flex items-center gap-2 bg-espresso-900 hover:bg-espresso-700 text-espresso-50 font-bold px-8 py-4 rounded-full transition-colors">
             Back to Home
           </Link>
@@ -486,29 +526,108 @@ export default function OrderPage() {
                 ))}
               </div>
 
-              {/* COD */}
+              {/* Payment */}
               <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-espresso-100">
-                <h2 className="text-espresso-900 font-bold text-xl mb-5 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
+                <h2 className="text-espresso-900 font-bold text-xl mb-2 flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
                   <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">4</span>
                   Payment
                 </h2>
-                <div className="flex items-start gap-4 bg-espresso-50 border border-espresso-200 rounded-2xl p-5">
-                  <div className="w-12 h-12 bg-espresso-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C3317" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="6" width="20" height="12" rx="2"/>
-                      <circle cx="12" cy="12" r="2"/>
-                      <path d="M6 12h.01M18 12h.01"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-espresso-900 font-bold mb-1">Cash on Delivery</p>
-                    <p className="text-espresso-600 text-sm">Pay in cash when your order arrives. No upfront payment required.</p>
-                  </div>
-                  <div className="ml-auto flex-shrink-0">
-                    <div className="w-5 h-5 rounded-full border-2 border-espresso-400 bg-espresso-400 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    </div>
-                  </div>
+                <p className="text-espresso-500 text-sm mb-5">
+                  Pay cash on arrival, or send it ahead by QR. Either way you can place your order now — we confirm every payment by hand.
+                </p>
+
+                <div role="radiogroup" aria-label="Payment method" className="space-y-3">
+                  {CHECKOUT_PAYMENT_METHODS.map(method => {
+                    const account = qrAccountFor(method)
+                    const selected = paymentMethod === method
+                    return (
+                      <div
+                        key={method}
+                        className={`rounded-2xl border transition-colors ${
+                          selected ? 'border-espresso-400 bg-espresso-50' : 'border-espresso-200 bg-white hover:border-espresso-300'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setPaymentMethod(method)}
+                          className="w-full flex items-start gap-4 p-5 text-left"
+                        >
+                          <span className="w-12 h-12 bg-espresso-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            {account ? (
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C3317" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                <path d="M14 14h3v3h-3zM21 14v3M21 21h-7"/>
+                              </svg>
+                            ) : (
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5C3317" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <path d="M6 12h.01M18 12h.01"/>
+                              </svg>
+                            )}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-espresso-900 font-bold mb-1">{paymentMethodLabel(method)}</span>
+                            <span className="block text-espresso-600 text-sm">
+                              {account
+                                ? `Scan the ${account.label} QR and send your payment before delivery.`
+                                : 'Pay in cash when your order arrives. No upfront payment required.'}
+                            </span>
+                          </span>
+                          <span
+                            className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              selected ? 'border-espresso-400 bg-espresso-400' : 'border-espresso-300'
+                            }`}
+                          >
+                            {selected && <span className="w-2 h-2 rounded-full bg-white" />}
+                          </span>
+                        </button>
+
+                        {/* The QR is the only way to address the payment — the
+                            wallets mask the account number on a share-QR, so
+                            the digits below are a check, not something to
+                            type. */}
+                        {selected && account && (
+                          <div className="border-t border-espresso-200 px-5 pt-4 pb-5">
+                            <div className="flex flex-col sm:flex-row gap-5">
+                              <div className="flex-shrink-0 mx-auto sm:mx-0 bg-white border border-espresso-200 rounded-xl p-2">
+                                <Image
+                                  src={account.image}
+                                  alt={`${account.label} QR code for ${account.accountName}`}
+                                  width={account.width}
+                                  height={account.height}
+                                  className="w-[220px] h-auto rounded-lg"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-espresso-500 text-xs font-semibold uppercase tracking-wider mb-0.5">Amount to send</p>
+                                <p className="text-espresso-900 font-bold text-2xl mb-4">₱{orderTotal.toLocaleString()}</p>
+
+                                <p className="text-espresso-500 text-xs font-semibold uppercase tracking-wider mb-0.5">Account</p>
+                                <p className="text-espresso-900 font-semibold text-sm">{account.accountName}</p>
+                                <p className="text-espresso-600 text-sm mb-4">
+                                  {account.accountRefLabel}: <span className="font-mono">{account.accountRef}</span>
+                                </p>
+
+                                <p className="text-espresso-600 text-sm mb-3">{account.scanHint}</p>
+
+                                <div className="bg-white border border-espresso-200 rounded-xl px-3.5 py-3 text-espresso-600 text-xs leading-relaxed">
+                                  <strong className="text-espresso-900">Send us your receipt.</strong> We can&apos;t see your payment
+                                  automatically, so message us a screenshot quoting your order number and we&apos;ll confirm it. Your
+                                  confirmation email carries the final amount including delivery — send that figure if it differs
+                                  from the one above.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -638,7 +757,7 @@ export default function OrderPage() {
 
                 <div className="border-t border-espresso-200 pt-4 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-espresso-900 font-bold text-lg">Total (COD)</span>
+                    <span className="text-espresso-900 font-bold text-lg">Total ({paymentMethodLabel(paymentMethod)})</span>
                     <span className="text-espresso-900 font-bold text-xl">₱{orderTotal.toLocaleString()}</span>
                   </div>
                 </div>
@@ -683,7 +802,7 @@ export default function OrderPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-                    COD
+                    {paymentMethodLabel(paymentMethod)}
                   </span>
                 </div>
               </div>
