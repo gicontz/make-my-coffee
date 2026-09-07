@@ -3,6 +3,7 @@ import { Playfair_Display, Work_Sans } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import MessengerChat from '@/components/MessengerChat'
 import { CartProvider } from '@/context/CartContext'
 
 const playfair = Playfair_Display({
@@ -31,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main className="pt-16">{children}</main>
           <Footer />
+          {/* Renders nothing without NEXT_PUBLIC_FB_PAGE_ID, and nothing on
+              /order or /admin — see the component. */}
+          <MessengerChat />
         </CartProvider>
       </body>
     </html>

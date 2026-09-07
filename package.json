@@ -11,7 +11,9 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/functions": "^3.9.5",
     "leaflet": "^1.9.4",
     "next": "14.2.10",
     "nodemailer": "^8.0.10",
