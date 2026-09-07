@@ -35,12 +35,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // HTTP driver has no SQL-fragment composition (see lib/stats.ts), so
     // `${sql\`NOW()\`}` would bind as a parameter, not splice in as SQL.
     if (payment_status === 'paid') {
-      // Every order is inserted with payment_method = 'cod' as a placeholder
-      // (there's no live online gateway to report a real one at checkout
-      // time), but the cash that actually shows up can be COD, GCash, Maya or
-      // a bank transfer — whichever the admin and customer settled on. So
-      // marking an order paid requires a real method rather than trusting the
-      // placeholder.
+      // An order's payment_method is only what the customer *picked* at
+      // checkout — nothing verifies a QR payment (decision.md D13), and what
+      // actually turns up can be anything: someone who chose GCash can still
+      // hand over cash at the door, or settle by bank transfer. So marking an
+      // order paid requires an explicitly stated method rather than promoting
+      // the customer's intent, and the admin list is wider than the checkout
+      // one (lib/paymentMethods.ts).
       if (!isPaymentMethod(payment_method)) {
         return NextResponse.json({ error: 'payment_method is required when marking an order paid' }, { status: 400 })
       }

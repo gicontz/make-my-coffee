@@ -63,6 +63,14 @@ function nextOrderActions(status: string): { label: string; value: string; style
   return map[status] ?? []
 }
 
+// The method the customer picked leads the "Paid via" menu — it's the likely
+// answer — but every method stays selectable: someone who chose GCash at
+// checkout can still hand over cash at the door, and only the admin knows
+// which actually happened.
+function methodsForOrder(chosen: string) {
+  return [...PAYMENT_METHODS].sort((a, b) => Number(b.value === chosen) - Number(a.value === chosen))
+}
+
 const FILTER_TABS = ['all', 'pending', 'approved', 'shipped', 'delivered', 'cancelled']
 
 export default function AdminOrders() {
@@ -191,6 +199,16 @@ export default function AdminOrders() {
                     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${pStatus?.color}`}>
                       {pStatus?.label}{order.payment_status === 'paid' ? ` · ${paymentMethodLabel(order.payment_method)}` : ''}
                     </span>
+                    {/* On an unpaid order payment_method is only what the
+                        customer picked at checkout — no QR payment is verified
+                        (decision.md D13), so it gets its own neutral chip.
+                        Folding it into the status badge above would make
+                        "Unpaid · GCash" read like money already arrived. */}
+                    {order.payment_status === 'unpaid' && (
+                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border bg-espresso-50 text-espresso-600 border-espresso-200">
+                        Chose {paymentMethodLabel(order.payment_method)}
+                      </span>
+                    )}
                     <span className="text-espresso-400 text-xs">
                       {new Date(order.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -307,13 +325,16 @@ export default function AdminOrders() {
                           <p className="px-3 pb-1.5 mb-0.5 text-[10px] font-semibold text-espresso-400 uppercase tracking-wider border-b border-espresso-50">
                             Paid via
                           </p>
-                          {PAYMENT_METHODS.map(method => (
+                          {methodsForOrder(order.payment_method).map(method => (
                             <button
                               key={method.value}
                               onClick={() => markPaid(order.id, method.value)}
-                              className="w-full text-left px-3 py-1.5 text-sm text-espresso-700 hover:bg-espresso-50 transition-colors"
+                              className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm text-espresso-700 hover:bg-espresso-50 transition-colors"
                             >
-                              {method.label}
+                              <span className="flex-1 min-w-0 truncate">{method.label}</span>
+                              {method.value === order.payment_method && (
+                                <span className="flex-shrink-0 text-[10px] font-semibold text-espresso-400 uppercase tracking-wider">Chosen</span>
+                              )}
                             </button>
                           ))}
                         </div>

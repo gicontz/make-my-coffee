@@ -12,6 +12,8 @@ still says USD/`$` with $8.99/$14.99/$19.99 — that is **stale**.
 and `toLocaleString()`. Do not reintroduce dollar formatting.
 
 ## D2 — Cash on Delivery instead of PayPal
+*(Extended by D13: COD is no longer the only option, but it is still the only
+one where money and goods meet. No gateway was integrated.)*
 **Decision:** Payment is COD. No online payment gateway integrated.
 **Why:** Simpler launch, matches local buyer expectations, avoids gateway fees/setup.
 **Implications:** Orders persist with `payment_method='cod'`, `payment_status='unpaid'`.
@@ -253,6 +255,44 @@ inventory (there is still no stock tracking). Products removed from
 `lib/products.ts` become unorderable immediately, which is the intended
 behavior for a delisted item.
 
+## D13 — Manual QR payments: display the code, verify nothing
+**Decision:** Checkout offers Cash on Delivery, GCash, Maya and GoTyme Bank.
+Choosing a wallet shows that account's QR image, holder name and (masked)
+reference — and nothing else happens. Place Order stays enabled, the order
+inserts with `payment_status = 'unpaid'` exactly as COD does, and an admin
+still confirms every peso by hand via Mark Paid.
+**Why:** We have no merchant API for any of the three, so there is no way to
+learn whether a payment happened. Given that, the only honest options were to
+show the QR and say so, or not to offer the wallets at all. Gating checkout on
+an unverifiable claim — an "I have paid" checkbox, a receipt upload treated as
+proof — would have looked like verification while proving nothing, and would
+have cost orders from customers who intended to pay after.
+**Implications:**
+- `payment_method` on an unpaid order is *intent*, not fact. Nothing may read
+  it as evidence of payment; admin UI states "Chose GCash" rather than folding
+  it into the status badge.
+- Two method lists (`lib/paymentMethods.ts`): `CHECKOUT_PAYMENT_METHODS` is what
+  a customer may pick and what `POST /api/orders` accepts; `PAYMENT_METHODS` is
+  the wider set an admin may record, since someone who chose GCash can still
+  pay cash at the door. `bank_transfer` is admin-only.
+- No migration: `orders.payment_method` was already `TEXT`.
+- QR images live in `public/qr/` — a stable URL, because the confirmation email
+  embeds them and a hashed `/_next/static/media` path 404s after the next
+  deploy, breaking the QR in every email already sent.
+- We show the wallets' masked account numbers, so there is no typable
+  fallback and a customer who can't scan needs a human. The unmasked values are
+  recoverable (they're in the EMVCo QR payload — see `app/assets/qr/README.md`);
+  publishing a named individual's mobile number is the account holder's call,
+  which is why the default is masked rather than a technical limit.
+- The GCash QR could not be machine-decoded (OpenCV fails on it; Maya and
+  GoTyme decode fine), so it has only ever been checked by eye. Any regenerated
+  GCash QR must be scanned with a real phone before it ships.
+- Reconciliation is manual and there is no payment reference captured:
+  matching amounts and timestamps by eye against the wallet app.
+- An abandoned QR order still consumes a capped voucher's redemption (see the
+  open item below) — the same gap COD had, but easier to hit now that a
+  customer can leave without ever handing over cash.
+
 ---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.
@@ -273,7 +313,12 @@ behavior for a delisted item.
 - A voucher redemption is claimed at order creation and is **not** returned if
   the order is later cancelled in admin — a cancelled order still consumes its
   slot.
-- No order-confirmation page persistence beyond the returned `orderId`.
+- No order-confirmation page persistence beyond the returned `orderId`. A
+  customer who picked a QR method and closes the success screen has only the
+  confirmation email to pay from.
+- Nothing chases an unpaid QR order. There is no expiry, no reminder and no
+  cancellation sweep — an order where the customer never paid looks like any
+  other pending order until someone notices.
 - Lalamove pickup location (`LALAMOVE_PICKUP_ADDRESS/LAT/LNG`) not yet set in
   `.env.local` — until it is, every order still gets the flat ₱99/free-Pasig
   rate (D9), silently, with a console warning.

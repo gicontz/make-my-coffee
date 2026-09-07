@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { slotLabel } from '@/lib/deliverySlots'
+import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from '@/lib/paymentMethods'
 import type { AppliedVoucher } from '@/lib/vouchers'
 
 interface OrderItem {
@@ -31,6 +32,8 @@ export interface OrderEmailData {
   total: number
   deliverySlots?: string[]
   voucher?: AppliedVoucher | null
+  /** What the customer picked at checkout. Never a claim that they paid. */
+  paymentMethod?: string
 }
 
 // Web-safe stack — Outlook ignores `system-ui` and falls back to Times.
@@ -155,6 +158,57 @@ function infoBox(bg: string, border: string, inner: string): string {
     </table>`
 }
 
+// Absolute base for anything the email has to link or load. Email clients have
+// no page context, so relative paths are dead — and the QR lives at a stable
+// /qr/... path (not a hashed /_next/static one) precisely so an email sent
+// today still renders its image after the next deploy.
+function siteUrl(): string {
+  return (process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe').replace(/\/+$/, '')
+}
+
+// The "how to pay" block. COD keeps its original wording; the QR wallets get
+// the code itself, because the account numbers the wallets print on a share-QR
+// are masked — scanning is the only way for the customer to address the
+// payment, so the image has to survive into the inbox.
+//
+// Remote images are blocked by default in plenty of clients, so every scrap of
+// information the QR carries is repeated in text and a plain link to the image
+// is offered underneath. Nothing here is verified: the customer is told what to
+// send and asked to send proof, and an admin confirms it by hand.
+function paymentBox(method: string, orderId: number, total: number): string {
+  const account = qrAccountFor(method)
+
+  if (!account) {
+    return infoBox(
+      '#FFF8F0',
+      '#E8C9A0',
+      `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">💵 Cash on Delivery</p>
+       <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Please have <strong>₱${total.toLocaleString()}</strong> ready when your order arrives. No upfront payment required.</p>`
+    )
+  }
+
+  const src = `${siteUrl()}${account.image}`
+  const displayWidth = 200
+  const displayHeight = Math.round((account.height / account.width) * displayWidth)
+
+  return infoBox(
+    '#FFF8F0',
+    '#E8C9A0',
+    `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">📱 Pay with ${account.label}</p>
+     <p style="margin:0 0 12px;font-family:${FONT};color:#5C3317;font-size:14px;">Send <strong>₱${total.toLocaleString()}</strong> to the account below, then reply with a screenshot of your receipt quoting order <strong>#${orderId}</strong>. We'll confirm your payment by hand — your order is already placed either way.</p>
+     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px;">
+       <tr>
+         <td style="background:#ffffff;border:1px solid #F0E2D0;border-radius:10px;padding:8px;">
+           <a href="${src}" style="text-decoration:none;"><img src="${src}" alt="${account.label} QR code for ${account.accountName}" width="${displayWidth}" height="${displayHeight}" style="display:block;width:${displayWidth}px;height:auto;border:0;outline:none;"></a>
+         </td>
+       </tr>
+     </table>
+     <p style="margin:0 0 2px;font-family:${FONT};color:#1C0A00;font-size:14px;font-weight:600;">${account.accountName}</p>
+     <p style="margin:0 0 10px;font-family:${FONT};color:#5C3317;font-size:13px;">${account.accountRefLabel}: ${account.accountRef}</p>
+     <p style="margin:0;font-family:${FONT};color:#8B5E0A;font-size:12px;">QR not showing? <a href="${src}" style="color:#C8860A;">Open it here</a>. ${account.scanHint}</p>`
+  )
+}
+
 function base(content: string): string {
   return `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -197,6 +251,8 @@ function base(content: string): string {
 export async function sendOrderEmails(data: OrderEmailData) {
   const transporter = createTransport()
   const { orderId, customer, items, subtotal, discount, shipping, total, deliverySlots, voucher } = data
+  const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
+  const isQr = qrAccountFor(paymentMethod) !== null
   const customerName = `${customer.firstName} ${customer.lastName}`
   const deliveryWindow = deliverySlots?.length
     ? [...deliverySlots].sort().map(slotLabel).join(', ')
@@ -229,13 +285,16 @@ export async function sendOrderEmails(data: OrderEmailData) {
         ${customer.barangay ? detailRow('Barangay', customer.barangay) : ''}
         ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
         ${deliveryWindow ? detailRow('Delivery Time', deliveryWindow) : ''}
+        ${detailRow('Payment', isQr
+          ? `<strong>${paymentMethodLabel(paymentMethod)}</strong> — customer says they'll pay by QR. Unverified: confirm the money landed before marking this paid.`
+          : `<strong>${paymentMethodLabel(paymentMethod)}</strong>`)}
         ${voucher ? detailRow('Voucher', `<strong>${voucher.code}</strong> — ${voucher.label}`) : ''}
         ${customer.notes ? detailRow('Notes', customer.notes) : ''}
       </table>
 
       ${itemsTable(items)}
 
-      ${totalsTable(subtotal, discount, shipping, total, 'Total (COD)', 'Free', voucher)}
+      ${totalsTable(subtotal, discount, shipping, total, `Total (${paymentMethodLabel(paymentMethod)})`, 'Free', voucher)}
 
       ${button(`${process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe'}/admin/orders`, 'View in Admin →')}
     `),
@@ -255,7 +314,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
 
       ${itemsTable(items)}
 
-      ${totalsTable(subtotal, discount, shipping, total, 'Total to pay on delivery', '<span style="color:#16a34a;font-weight:600;">Free</span>', voucher)}
+      ${totalsTable(subtotal, discount, shipping, total, isQr ? 'Total to pay' : 'Total to pay on delivery', '<span style="color:#16a34a;font-weight:600;">Free</span>', voucher)}
 
       ${infoBox(
         '#FAF6F1',
@@ -271,12 +330,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
          <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
       ) : ''}
 
-      ${infoBox(
-        '#FFF8F0',
-        '#E8C9A0',
-        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">💵 Cash on Delivery</p>
-         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Please have <strong>₱${total.toLocaleString()}</strong> ready when your order arrives. No upfront payment required.</p>`
-      )}
+      ${paymentBox(paymentMethod, orderId, total)}
     `),
   })
 }
