@@ -32,14 +32,14 @@ const ROW = {
   payment_status: 'unpaid',
 }
 
-test('only shipped and delivered notify the customer', () => {
-  assert.ok(notifiesCustomer('shipped'))
-  assert.ok(notifiesCustomer('delivered'))
+test('shipped, delivered and cancelled notify the customer', () => {
+  for (const status of ['shipped', 'delivered', 'cancelled']) {
+    assert.ok(notifiesCustomer(status), `${status} should mail the customer`)
+  }
 
-  // 'approved' is internal bookkeeping; 'cancelled' is a conversation, not a
-  // notification. Both are deliberate omissions — if either starts mailing,
-  // that was a decision, not a slip.
-  for (const status of ['pending', 'approved', 'cancelled', 'paid', '', undefined, null, 7]) {
+  // 'approved' is internal bookkeeping — a deliberate omission. If it starts
+  // mailing, that was a decision, not a slip.
+  for (const status of ['pending', 'approved', 'paid', '', undefined, null, 7]) {
     assert.equal(notifiesCustomer(status), false, `${String(status)} must not mail the customer`)
   }
 })
@@ -47,7 +47,7 @@ test('only shipped and delivered notify the customer', () => {
 test('the notified list and the copy table cannot drift apart', () => {
   // sendOrderStatusEmail indexes STATUS_COPY by status; a status added to the
   // list without copy would render an email with an undefined subject.
-  assert.deepEqual([...NOTIFIED_ORDER_STATUSES], ['shipped', 'delivered'])
+  assert.deepEqual([...NOTIFIED_ORDER_STATUSES], ['shipped', 'delivered', 'cancelled'])
 })
 
 test('maps an order row into the status email payload', () => {

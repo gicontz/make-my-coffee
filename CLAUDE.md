@@ -71,9 +71,12 @@ Three transactional emails, all built in `lib/email.ts`:
 | Order placed | admin + customer | `sendOrderEmails()` |
 | Status → `shipped` | customer | `sendOrderStatusEmail()` |
 | Status → `delivered` | customer | `sendOrderStatusEmail()` |
+| Status → `cancelled` | customer | `sendOrderStatusEmail()` |
 
-`approved` and `cancelled` deliberately send nothing — see the comment on
-`NOTIFIED_ORDER_STATUSES`. Status mail fires from `PATCH /api/admin/orders/[id]`
+`approved` deliberately sends nothing — see the comment on
+`NOTIFIED_ORDER_STATUSES`. A cancellation email never shows a delivery address
+or a QR: if the order was paid it offers a refund, if it wasn't it says there is
+nothing outstanding. Status mail fires from `PATCH /api/admin/orders/[id]`
 only on a **real** transition: the UPDATE carries `AND order_status <> …`, so a
 re-clicked button writes nothing and therefore mails nothing.
 

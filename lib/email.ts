@@ -420,13 +420,17 @@ export async function sendOrderEmails(data: OrderEmailData) {
 
 // ── Order status updates ──────────────────────────────────────────────────
 //
-// Only two transitions are worth a customer's inbox: the order leaving, and
-// the order arriving. 'approved' is internal bookkeeping — from the customer's
-// side nothing has happened that the confirmation email didn't already
-// promise — and 'cancelled' deliberately isn't here either: a cancellation is
-// a conversation, not a notification, and it usually needs a human explaining
-// why. Adding it later means adding copy, not plumbing.
-export const NOTIFIED_ORDER_STATUSES = ['shipped', 'delivered'] as const
+// Three transitions reach the customer: the order leaving, the order arriving,
+// and the order being called off. 'approved' stays out — it is internal
+// bookkeeping, and from the customer's side nothing has happened that the
+// confirmation email didn't already promise.
+//
+// 'cancelled' is the one that most needs saying. Silence there leaves someone
+// waiting in for a delivery that is never coming, and — if they paid ahead by
+// QR — out of pocket with no acknowledgement that we know it. The email cannot
+// explain *why* (nothing records a reason), so it says what happened, what
+// happens to their money, and invites a reply.
+export const NOTIFIED_ORDER_STATUSES = ['shipped', 'delivered', 'cancelled'] as const
 
 export type NotifiedOrderStatus = (typeof NOTIFIED_ORDER_STATUSES)[number]
 
@@ -493,6 +497,11 @@ const STATUS_COPY: Record<NotifiedOrderStatus, { subject: (id: number) => string
     heading: name => `Delivered. Enjoy, ${name}!`,
     lead: 'Your order has been marked delivered. Keep the bottle chilled and shake before pouring — each 30ml shot is a full espresso.',
   },
+  cancelled: {
+    subject: id => `Order #${id} has been cancelled — Make My Coffee`,
+    heading: name => `Your order has been cancelled, ${name}`,
+    lead: 'This order will not be delivered. If that is unexpected, or you would like to place it again, just reply to this email and we will sort it out.',
+  },
 }
 
 export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
@@ -503,12 +512,42 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
     ? [...deliverySlots].sort().map(slotLabel).join(', ')
     : null
 
-  // Payment is still the customer's to complete on anything not yet marked
-  // paid — which, given nothing verifies a QR wallet (D13), is most orders at
-  // the moment they ship. Repeat the QR here: this is the last email before
-  // the goods arrive, and for a delivered-but-unpaid order it's the only
-  // prompt they'll get.
   const unpaid = paymentStatus !== 'paid'
+
+  // What the money section says depends on both halves — status and payment —
+  // and getting the pairing wrong is how an email asks a customer to pay for
+  // an order we just cancelled.
+  //
+  //   shipped/delivered + unpaid  → the QR again. Nothing verifies a QR wallet
+  //     (D13), so most orders are still unpaid when they ship, and for a
+  //     delivered-but-unpaid order this is the only prompt they'll get.
+  //   cancelled + paid            → we are holding their money. Say so
+  //     plainly and start the refund, rather than waiting to be chased.
+  //   cancelled + unpaid          → close it off, so nobody pays for an order
+  //     that no longer exists.
+  const paymentSection =
+    status === 'cancelled'
+      ? unpaid
+        ? infoBox(
+            '#FAF6F1',
+            '#F0E2D0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">Nothing to pay</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Our records show this order was never paid, so there is nothing outstanding. If you already sent a payment for it, reply to this email and we will trace it.</p>`
+          )
+        : infoBox(
+            '#FFF8F0',
+            '#E8C9A0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">↩️ Refund due</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">We have <strong>₱${total.toLocaleString()}</strong> recorded as paid on this order. Reply to this email with the account you paid from and we will return it.</p>`
+          )
+      : unpaid
+        ? paymentBox(paymentMethod, orderId, total)
+        : infoBox(
+            '#F0FDF4',
+            '#BBF7D0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#16a34a;">✅ Paid</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">₱${total.toLocaleString()} received — nothing to prepare.</p>`
+          )
 
   await deliver({
     to: customer.email,
@@ -524,7 +563,7 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
 
       <p style="margin:0 0 24px;font-family:${FONT};color:#5C3317;font-size:15px;">${copy.lead}</p>
 
-      ${infoBox(
+      ${status === 'cancelled' ? '' : infoBox(
         '#FAF6F1',
         '#F0E2D0',
         `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
@@ -538,16 +577,9 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
          <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
       ) : ''}
 
-      ${unpaid
-        ? paymentBox(paymentMethod, orderId, total)
-        : infoBox(
-            '#F0FDF4',
-            '#BBF7D0',
-            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#16a34a;">✅ Paid</p>
-             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">₱${total.toLocaleString()} received — nothing to prepare.</p>`
-          )}
+      ${paymentSection}
 
-      <p style="margin:0;font-family:${FONT};color:#8B5E0A;font-size:13px;">Something wrong with this order? Just reply to this email.</p>
+      ${status === 'cancelled' ? '' : `<p style="margin:0;font-family:${FONT};color:#8B5E0A;font-size:13px;">Something wrong with this order? Just reply to this email.</p>`}
     `),
   })
 }
