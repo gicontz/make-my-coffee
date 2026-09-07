@@ -111,17 +111,22 @@ the full credential walkthrough; this is the shape of it.
 
 | Piece | File | Gated on |
 |---|---|---|
-| Chat bubble | `components/MessengerChat.tsx` | `NEXT_PUBLIC_FB_PAGE_ID` |
+| Chat launcher (m.me link) | `components/MessengerChat.tsx` | `NEXT_PUBLIC_FB_PAGE_ID` |
 | Webhook | `app/api/messenger/webhook/route.ts` | `FB_APP_SECRET`, `FB_VERIFY_TOKEN` |
 | Replies out | `lib/messenger/send.ts` | `FB_PAGE_ACCESS_TOKEN` |
 | Buttons + parsing (pure) | `lib/messenger/conversation.ts` | — |
 | Order lookup + dedupe | `lib/messenger/store.ts` | migration 0006 |
 | Free-text answers | `lib/messenger/assistant.ts` | `ANTHROPIC_API_KEY` |
 
-Each is independently dark without its variable: no Page ID, no bubble and no
-Facebook SDK fetched; no Anthropic key, the bot still answers with buttons.
+Each is independently dark without its variable: no Page ID, no launcher; no
+Anthropic key, the bot still answers with buttons.
 
-**The bubble is hidden on `/order` and `/admin`** — a floating bubble sits
+**Meta's Chat Plugin was discontinued on 9 May 2024** — there is no embeddable
+bubble to use any more. The launcher is a plain `m.me` link we style ourselves,
+which also means no Facebook SDK on the page and no domain-allowlisting step.
+`NEXT_PUBLIC_FB_PAGE_ID` takes the numeric Page ID or the Page username.
+
+**The launcher is hidden on `/order` and `/admin`** — a floating button sits
 exactly where the Place Order button is on a phone.
 
 **Order lookups need an order number *and* the email on that order.**
@@ -141,12 +146,21 @@ in two serverless instances.
 1. Merge and deploy — the route answers Meta's `GET` challenge. **Meta will not
    save a callback URL until it does**, so the code must ship before the webhook
    can be configured. Use a preview deployment.
-2. Configure the webhook in the Meta app, subscribing the Page to `messages`,
+2. Configure the webhook in the app dashboard's **Webhooks** product (or
+   Messenger → Settings → Webhooks) → *Add Callback URL*. Subscribe the Page to
+   `messages` first and confirm the base flow works before adding
    `messaging_postbacks`, `messaging_optins`, `messaging_referrals`.
-3. Allowlist the domain in Business Suite, or the bubble renders nothing and
-   logs nothing useful.
-4. App Review for `pages_messaging` + Business Verification before the bot can
+3. App Review for `pages_messaging` + Business Verification before the bot can
    talk to anyone who isn't an admin/developer/tester on the app.
+
+Note the launcher needs none of the above — an `m.me` link works the moment
+`NEXT_PUBLIC_FB_PAGE_ID` is set, and messages land in the Page inbox for a
+human whether or not the bot exists yet.
+
+**Message tags are not an option here.** `POST_PURCHASE_UPDATE`,
+`CONFIRMED_EVENT_UPDATE` and `ACCOUNT_UPDATE` return error 100 as of
+2026-04-27, so there is no supported way to message a customer outside the
+24-hour window. Order notifications stay on email.
 
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
