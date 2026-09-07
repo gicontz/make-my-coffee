@@ -138,6 +138,7 @@ export interface OrderRow {
   payment_status: string
   payment_method: string
   paid_at: string | null
+  updated_at: string
 }
 
 // Inserts an order in a known state, for specs that assert on aggregates

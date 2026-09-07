@@ -1,7 +1,10 @@
 import nodemailer from 'nodemailer'
-import { slotLabel } from '@/lib/deliverySlots'
-import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from '@/lib/paymentMethods'
-import type { AppliedVoucher } from '@/lib/vouchers'
+// Relative, with extensions, like lib/voucherInput.ts — these have to resolve
+// under `node --experimental-strip-types` for tests/statusEmails.test.ts, and
+// the `@/` alias is a bundler concern that plain node knows nothing about.
+import { slotLabel } from './deliverySlots.ts'
+import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from './paymentMethods.ts'
+import type { AppliedVoucher } from './vouchers.ts'
 
 interface OrderItem {
   id: string
@@ -42,38 +45,123 @@ const FONT = "Arial,'Helvetica Neue',Helvetica,sans-serif"
 let warnedNoCredentials = false
 
 // nodemailer's jsonTransport resolves sendMail() without opening a socket, so
-// the whole compose path still runs — templates rendered, both messages built —
-// while nothing dials smtp.gmail.com.
+// the whole compose path still runs — templates rendered, every message built —
+// while nothing leaves the machine.
 function mockTransport() {
   return nodemailer.createTransport({ jsonTransport: true })
 }
 
-function createTransport() {
+// ── Delivery ──────────────────────────────────────────────────────────────
+//
+// Three ways out, chosen per-call in this order:
+//
+//   1. mocked   — EMAIL_TRANSPORT=json, or no credentials at all
+//   2. Resend   — RESEND_API_KEY set; sends as MAIL_FROM, i.e. our own domain
+//   3. Gmail    — the original path, kept as a fallback
+//
+// The mock check is deliberately first. The e2e suite sets EMAIL_TRANSPORT=json
+// (playwright.config.ts) and runs against a throwaway Neon branch with real
+// order data in it; if a stray RESEND_API_KEY in the environment could outrank
+// that, a test run would mail invented customers for real.
+//
+// Gmail stays because it's what is configured today and a domain can fail
+// verification. Note it cannot honour MAIL_FROM — Gmail rewrites a From it
+// doesn't own — so while that path is live, mail still comes from the Gmail
+// account. That's the whole reason for moving to Resend.
+
+export interface OutboundMessage {
+  to: string | string[]
+  bcc?: string[]
+  subject: string
+  html: string
+  /**
+   * Stable per-message identity, e.g. `order-41-shipped`. Resend rejects a
+   * repeat of the same key within 24h, so a retried admin click or a
+   * re-delivered request can't mail the customer twice.
+   */
+  idempotencyKey?: string
+}
+
+function mailFrom(): string {
+  return process.env.MAIL_FROM || 'Make My Coffee <orders@makemycoffee.cafe>'
+}
+
+// Customers reply to these — with a payment screenshot, most of all (D13).
+// Point that at a human rather than at a send-only mailbox.
+function replyTo(): string | undefined {
+  return process.env.ADMIN_EMAIL || undefined
+}
+
+async function deliverViaResend(msg: OutboundMessage, apiKey: string): Promise<void> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      ...(msg.idempotencyKey ? { 'Idempotency-Key': msg.idempotencyKey } : {}),
+    },
+    body: JSON.stringify({
+      from: mailFrom(),
+      to: msg.to,
+      ...(msg.bcc?.length ? { bcc: msg.bcc } : {}),
+      ...(replyTo() ? { reply_to: replyTo() } : {}),
+      subject: msg.subject,
+      html: msg.html,
+    }),
+  })
+
+  if (!res.ok) {
+    // Resend reports a rejected send as a 4xx with a JSON body naming the
+    // reason — an unverified domain being the common one. Surface it; the
+    // caller decides whether it's fatal (it isn't — see D5).
+    const detail = await res.text().catch(() => '')
+    throw new Error(`Resend refused the message (${res.status}): ${detail.slice(0, 300)}`)
+  }
+}
+
+async function deliverViaGmail(msg: OutboundMessage, user: string, pass: string): Promise<void> {
+  const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
+  await transporter.sendMail({
+    from: `"Make My Coffee" <${user}>`,
+    to: msg.to,
+    ...(msg.bcc?.length ? { bcc: msg.bcc } : {}),
+    ...(replyTo() ? { replyTo: replyTo() } : {}),
+    subject: msg.subject,
+    html: msg.html,
+  })
+}
+
+async function deliver(msg: OutboundMessage): Promise<void> {
+  if (process.env.EMAIL_TRANSPORT === 'json') {
+    await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html })
+    return
+  }
+
+  const resendKey = process.env.RESEND_API_KEY
+  if (resendKey) return deliverViaResend(msg, resendKey)
+
   const user = process.env.GMAIL_USER
   // Gmail app passwords are shown in 4 space-separated groups for
   // readability; the spaces aren't part of the secret — strip them.
   const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '')
+  if (user && pass) return deliverViaGmail(msg, user, pass)
 
-  // Set by the e2e server (playwright.config.ts). Every order-placing test
-  // would otherwise attempt a real Gmail login and fail auth, and repeated
-  // failed auth from one IP is how a sender gets flagged as a bot.
-  if (process.env.EMAIL_TRANSPORT === 'json') return mockTransport()
-
-  // Absent credentials are a misconfiguration in production — but dialling
-  // Gmail to discover that only burns more failed logins. Mock and say so
-  // instead. Either way the order is unaffected: sendOrderEmails is
-  // fire-and-forget by design (decision.md D5).
-  if (!user || !pass) {
-    if (!warnedNoCredentials) {
-      console.warn(
-        'GMAIL_USER / GMAIL_APP_PASSWORD are not set — order email is being mocked, not delivered.'
-      )
-      warnedNoCredentials = true
-    }
-    return mockTransport()
+  // Absent credentials are a misconfiguration in production — but dialling a
+  // provider to discover that just burns failed auth attempts. Mock and say so
+  // instead. Either way the order is unaffected: mail is fire-and-forget by
+  // design (decision.md D5).
+  if (!warnedNoCredentials) {
+    console.warn(
+      'Neither RESEND_API_KEY nor GMAIL_USER/GMAIL_APP_PASSWORD is set — email is being mocked, not delivered.'
+    )
+    warnedNoCredentials = true
   }
+  await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html })
+}
 
-  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
+// Staff copied on everything we send (comma-separated env).
+function staffBcc(): string[] {
+  return (process.env.BCC_EMAIL ?? '').split(',').map(e => e.trim()).filter(Boolean)
 }
 
 function itemsTable(items: OrderItem[]): string {
@@ -249,7 +337,6 @@ function base(content: string): string {
 }
 
 export async function sendOrderEmails(data: OrderEmailData) {
-  const transporter = createTransport()
   const { orderId, customer, items, subtotal, discount, shipping, total, deliverySlots, voucher } = data
   const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
   const isQr = qrAccountFor(paymentMethod) !== null
@@ -258,20 +345,16 @@ export async function sendOrderEmails(data: OrderEmailData) {
     ? [...deliverySlots].sort().map(slotLabel).join(', ')
     : null
 
-  // Staff to BCC on the admin notification (comma-separated env)
-  const staffBcc = (process.env.BCC_EMAIL ?? '')
-    .split(',')
-    .map(e => e.trim())
-    .filter(Boolean)
+  const bcc = staffBcc()
 
   const detailRow = (label: string, value: string) =>
     `<tr><td style="padding:6px 0;font-family:${FONT};color:#5C3317;font-size:13px;width:120px;">${label}</td><td style="padding:6px 0;font-family:${FONT};color:#1C0A00;">${value}</td></tr>`
 
   // ── Admin notification ──
-  await transporter.sendMail({
-    from: `"Make My Coffee" <${process.env.GMAIL_USER}>`,
-    to: process.env.ADMIN_EMAIL,
-    ...(staffBcc.length ? { bcc: staffBcc } : {}),
+  await deliver({
+    to: process.env.ADMIN_EMAIL ?? '',
+    bcc,
+    idempotencyKey: `order-${orderId}-admin`,
     subject: `New Order #${orderId} — ${customerName}`,
     html: base(`
       <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">New Order Received</h2>
@@ -301,12 +384,12 @@ export async function sendOrderEmails(data: OrderEmailData) {
   })
 
   // ── Customer confirmation ──
-  await transporter.sendMail({
-    from: `"Make My Coffee" <${process.env.GMAIL_USER}>`,
+  await deliver({
     to: customer.email,
     // BCC staff on the customer confirmation too — silent to the customer,
     // so we and staff get a copy of every email we send.
-    ...(staffBcc.length ? { bcc: staffBcc } : {}),
+    bcc,
+    idempotencyKey: `order-${orderId}-confirmation`,
     subject: `Order Confirmed #${orderId} — Make My Coffee`,
     html: base(`
       <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">Thank you, ${customer.firstName}!</h2>
@@ -331,6 +414,172 @@ export async function sendOrderEmails(data: OrderEmailData) {
       ) : ''}
 
       ${paymentBox(paymentMethod, orderId, total)}
+    `),
+  })
+}
+
+// ── Order status updates ──────────────────────────────────────────────────
+//
+// Three transitions reach the customer: the order leaving, the order arriving,
+// and the order being called off. 'approved' stays out — it is internal
+// bookkeeping, and from the customer's side nothing has happened that the
+// confirmation email didn't already promise.
+//
+// 'cancelled' is the one that most needs saying. Silence there leaves someone
+// waiting in for a delivery that is never coming, and — if they paid ahead by
+// QR — out of pocket with no acknowledgement that we know it. The email cannot
+// explain *why* (nothing records a reason), so it says what happened, what
+// happens to their money, and invites a reply.
+export const NOTIFIED_ORDER_STATUSES = ['shipped', 'delivered', 'cancelled'] as const
+
+export type NotifiedOrderStatus = (typeof NOTIFIED_ORDER_STATUSES)[number]
+
+export function notifiesCustomer(status: unknown): status is NotifiedOrderStatus {
+  return typeof status === 'string' && (NOTIFIED_ORDER_STATUSES as readonly string[]).includes(status)
+}
+
+export interface OrderStatusEmailData {
+  orderId: number
+  status: NotifiedOrderStatus
+  customer: {
+    firstName: string
+    email: string
+    address: string
+    barangay?: string
+    city: string
+    province: string
+    postalCode: string
+  }
+  total: number
+  deliverySlots?: string[]
+  paymentMethod?: string
+  /** 'paid' suppresses the payment reminder; anything else keeps it. */
+  paymentStatus?: string
+}
+
+/**
+ * Shapes an `orders` row (snake_case, straight out of the UPDATE ... RETURNING)
+ * into what the status email needs. Lives here rather than in the route so it
+ * can be tested without a database.
+ */
+export function statusEmailFromOrderRow(
+  row: Record<string, unknown>,
+  status: NotifiedOrderStatus
+): OrderStatusEmailData {
+  const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  return {
+    orderId: Number(row.id),
+    status,
+    customer: {
+      firstName: str(row.first_name),
+      email: str(row.email),
+      address: str(row.address),
+      barangay: str(row.barangay) || undefined,
+      city: str(row.city),
+      province: str(row.province),
+      postalCode: str(row.postal_code),
+    },
+    total: Number(row.total ?? 0),
+    deliverySlots: Array.isArray(row.delivery_slots) ? (row.delivery_slots as string[]) : [],
+    paymentMethod: str(row.payment_method) || DEFAULT_PAYMENT_METHOD,
+    paymentStatus: str(row.payment_status) || 'unpaid',
+  }
+}
+
+const STATUS_COPY: Record<NotifiedOrderStatus, { subject: (id: number) => string; heading: (name: string) => string; lead: string }> = {
+  shipped: {
+    subject: id => `Your order #${id} is on its way — Make My Coffee`,
+    heading: name => `On the way, ${name}!`,
+    lead: 'Your order has left us and is heading to the address below. Please keep your phone reachable — our rider may call when they are close.',
+  },
+  delivered: {
+    subject: id => `Order #${id} delivered — Make My Coffee`,
+    heading: name => `Delivered. Enjoy, ${name}!`,
+    lead: 'Your order has been marked delivered. Keep the bottle chilled and shake before pouring — each 30ml shot is a full espresso.',
+  },
+  cancelled: {
+    subject: id => `Order #${id} has been cancelled — Make My Coffee`,
+    heading: name => `Your order has been cancelled, ${name}`,
+    lead: 'This order will not be delivered. If that is unexpected, or you would like to place it again, just reply to this email and we will sort it out.',
+  },
+}
+
+export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
+  const { orderId, status, customer, total, deliverySlots, paymentStatus } = data
+  const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
+  const copy = STATUS_COPY[status]
+  const deliveryWindow = deliverySlots?.length
+    ? [...deliverySlots].sort().map(slotLabel).join(', ')
+    : null
+
+  const unpaid = paymentStatus !== 'paid'
+
+  // What the money section says depends on both halves — status and payment —
+  // and getting the pairing wrong is how an email asks a customer to pay for
+  // an order we just cancelled.
+  //
+  //   shipped/delivered + unpaid  → the QR again. Nothing verifies a QR wallet
+  //     (D13), so most orders are still unpaid when they ship, and for a
+  //     delivered-but-unpaid order this is the only prompt they'll get.
+  //   cancelled + paid            → we are holding their money. Say so
+  //     plainly and start the refund, rather than waiting to be chased.
+  //   cancelled + unpaid          → close it off, so nobody pays for an order
+  //     that no longer exists.
+  const paymentSection =
+    status === 'cancelled'
+      ? unpaid
+        ? infoBox(
+            '#FAF6F1',
+            '#F0E2D0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">Nothing to pay</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Our records show this order was never paid, so there is nothing outstanding. If you already sent a payment for it, reply to this email and we will trace it.</p>`
+          )
+        : infoBox(
+            '#FFF8F0',
+            '#E8C9A0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#C8860A;">↩️ Refund due</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">We have <strong>₱${total.toLocaleString()}</strong> recorded as paid on this order. Reply to this email with the account you paid from and we will return it.</p>`
+          )
+      : unpaid
+        ? paymentBox(paymentMethod, orderId, total)
+        : infoBox(
+            '#F0FDF4',
+            '#BBF7D0',
+            `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#16a34a;">✅ Paid</p>
+             <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">₱${total.toLocaleString()} received — nothing to prepare.</p>`
+          )
+
+  await deliver({
+    to: customer.email,
+    bcc: staffBcc(),
+    // One notification per order per status, however many times the admin
+    // clicks — the route already guards against a repeat transition, this
+    // guards against a retried request.
+    idempotencyKey: `order-${orderId}-${status}`,
+    subject: copy.subject(orderId),
+    html: base(`
+      <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">${copy.heading(customer.firstName)}</h2>
+      <p style="margin:0 0 24px;font-family:${FONT};color:#8B5E0A;font-size:14px;">Order #${orderId}</p>
+
+      <p style="margin:0 0 24px;font-family:${FONT};color:#5C3317;font-size:15px;">${copy.lead}</p>
+
+      ${status === 'cancelled' ? '' : infoBox(
+        '#FAF6F1',
+        '#F0E2D0',
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">📦 Delivery Address</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${customer.address}${customer.barangay ? `, Brgy. ${customer.barangay}` : ''}<br>${customer.city}, ${customer.province} ${customer.postalCode}</p>`
+      )}
+
+      ${status === 'shipped' && deliveryWindow ? infoBox(
+        '#FAF6F1',
+        '#F0E2D0',
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery Time</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
+      ) : ''}
+
+      ${paymentSection}
+
+      ${status === 'cancelled' ? '' : `<p style="margin:0;font-family:${FONT};color:#8B5E0A;font-size:13px;">Something wrong with this order? Just reply to this email.</p>`}
     `),
   })
 }
