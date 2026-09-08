@@ -43,6 +43,11 @@ const MENU: QuickReply[] = [
   { title: 'Talk to a human', payload: PAYLOADS.human },
 ]
 
+/** How a tapped button reads back in a transcript. */
+export function quickReplyTitle(payload: string): string {
+  return MENU.find(q => q.payload === payload)?.title ?? 'Menu'
+}
+
 export function menuReply(text = 'What can I help you with?'): Reply {
   return { text, quickReplies: MENU }
 }

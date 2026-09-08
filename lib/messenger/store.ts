@@ -2,10 +2,10 @@
 // gate in front of order lookups. Schema in lib/migrations/0006.
 
 import { sql } from '@/lib/db'
-import type { OrderReference, TrackableOrder } from './conversation.ts'
-import { isRateLimited, nextAttemptWindow } from './rateLimit.ts'
+import type { OrderReference, TrackableOrder } from '../chat/conversation.ts'
+import { isRateLimited, nextAttemptWindow } from '../chat/rateLimit.ts'
 
-export { LOOKUP_WINDOW_MINUTES, MAX_FAILED_LOOKUPS, isRateLimited, nextAttemptWindow } from './rateLimit.ts'
+export { LOOKUP_WINDOW_MINUTES, MAX_FAILED_LOOKUPS, isRateLimited, nextAttemptWindow } from '../chat/rateLimit.ts'
 
 /**
  * Claims a message id. True the first time, false for a repeat.

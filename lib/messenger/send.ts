@@ -1,6 +1,6 @@
 // Outbound half of the Messenger Platform: the Send API.
 
-import type { Reply } from './conversation.ts'
+import type { Reply } from '../chat/conversation.ts'
 
 const GRAPH_VERSION = 'v21.0'
 
