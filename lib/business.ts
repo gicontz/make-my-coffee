@@ -1,35 +1,44 @@
 // Who we are, for the pages that have to say so.
 //
-// One place, because a contact address that appears in three files is a
-// contact address that gets changed in two.
+// Read from the environment rather than hardcoded, because this repository is
+// public: a personal phone number or a home address committed here is
+// committed permanently, and rewriting git history is not a privacy control.
+// The values still end up on a public page — that is their purpose — but they
+// live in Vercel, where they can be changed or removed.
+//
+// These are read at module scope and the pages that use them are statically
+// prerendered, so a change needs a redeploy to appear. Setting the variable is
+// not enough on its own.
+//
+// Server-side names deliberately (no NEXT_PUBLIC_ prefix): the pages are server
+// components, so the values reach the HTML without also being inlined into the
+// JavaScript bundle of every other page.
 
 /**
- * ⚠️ Currently a personal Gmail — it is the address that actually receives
- * order mail today (ADMIN_EMAIL), so it works. Swap it for an address on the
- * domain (hello@makemycoffee.cafe) once Resend verification is done, and
- * update ADMIN_EMAIL in Vercel to match.
+ * Where customers write to. Falls back to ADMIN_EMAIL — the address that
+ * already receives order mail — so the contact page is never dead, and then to
+ * a domain address as a last resort.
  */
-export const CONTACT_EMAIL = 'gimelcontz@gmail.com'
+export const CONTACT_EMAIL =
+  process.env.CONTACT_EMAIL || process.env.ADMIN_EMAIL || 'hello@makemycoffee.cafe'
 
 /**
- * Left blank on purpose rather than invented. A contact page that prints a
- * made-up phone number or address is worse than one that omits them — fill
- * these in and they appear automatically.
+ * Both optional. Unset renders nothing at all rather than an empty row — a
+ * contact page printing a blank or invented phone number is worse than one
+ * that simply omits it.
  */
-// Typed as string, not inferred as the empty-string literal — otherwise
-// TypeScript narrows `if (CONTACT_PHONE)` to `never` and filling one in stops
-// compiling.
-export const CONTACT_PHONE: string = ''
-export const BUSINESS_ADDRESS: string = ''
+export const CONTACT_PHONE = process.env.CONTACT_PHONE || ''
+export const BUSINESS_ADDRESS = process.env.BUSINESS_ADDRESS || ''
 
 /** Registered entity name, if and when there is one. */
-export const LEGAL_NAME = 'Make My Coffee'
+export const LEGAL_NAME = process.env.LEGAL_NAME || 'Make My Coffee'
 
 /** Delivery hours, matching the slots offered at checkout. */
 export const DELIVERY_HOURS = '9:00 AM – 7:00 PM daily'
 
 /**
- * Last substantive change to the privacy policy. Bump it when the policy
- * changes, not when the page is merely touched.
+ * Last substantive change to the privacy policy. Deliberately a code constant,
+ * not an env var: the date is a claim about when the policy text changed, so it
+ * belongs in the same commit as the text it describes.
  */
 export const PRIVACY_UPDATED = '8 September 2026'

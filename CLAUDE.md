@@ -196,6 +196,19 @@ function down.
 2026-04-27, so there is no supported way to message a customer outside the
 24-hour window. Order notifications stay on email.
 
+## Contact & Privacy pages
+`/contact` and `/privacy`, linked from the footer. Business details come from
+env (`lib/business.ts`) — `CONTACT_EMAIL` (falls back to `ADMIN_EMAIL`),
+`CONTACT_PHONE`, `BUSINESS_ADDRESS`, `LEGAL_NAME`. **Not hardcoded, because
+this repo is public**: a personal number committed here is committed
+permanently. Unset optional values render nothing rather than an empty row.
+Both pages are statically prerendered, so a change needs a redeploy.
+
+⚠️ **The privacy policy describes what the code actually does** — the
+collection list mirrors the `orders` and `chat_*` tables, and the processor list
+is every external host the app talks to. Add a processor or a column and that
+page is wrong until it is updated.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
