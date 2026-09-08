@@ -199,5 +199,6 @@ function down.
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
-- Shipping: flat ₱99, free only for Pasig City orders ≥ ₱1,000 (`lib/shipping.ts`)
+- Shipping is quoted live per order from the customer's pinned dropoff (`lib/shippingQuote.ts`); free for Pasig City orders ≥ ₱1,000, and the flat ₱99 in `lib/shipping.ts` is only the fallback when a quote can't be got
+- **Never state a delivery fee in customer-facing copy.** It isn't knowable ahead of the pin — see the comment on `deliveryReply()`
 - Currency is PHP (`₱`), integer pesos — no cents (D1)

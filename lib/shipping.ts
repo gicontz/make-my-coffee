@@ -8,8 +8,12 @@
 // secrets, none of which may end up in a browser bundle).
 
 export const FLAT_SHIPPING_FEE = 99
-const FREE_SHIPPING_CITY = 'pasig'
-const FREE_SHIPPING_MIN_SUBTOTAL = 1000
+
+// Exported so customer-facing copy (the chat bot, the model's system prompt)
+// can state the promo without restating the numbers — copy that repeats a
+// value goes stale silently, and nobody notices until someone is quoted wrong.
+export const FREE_SHIPPING_CITY = 'pasig'
+export const FREE_SHIPPING_MIN_SUBTOTAL = 1000
 
 function normalizeCity(city: string): string {
   return city.trim().toLowerCase().replace(/\s*city\s*$/i, '')

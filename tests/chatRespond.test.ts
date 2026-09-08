@@ -46,8 +46,18 @@ function deps(over: Partial<RespondDeps> = {}) {
 test('a tapped button answers from the button table', async () => {
   const { deps: d } = deps()
   const reply = await respondToPayload(PAYLOADS.delivery, d)
-  assert.match(reply.text, /₱99/)
+  assert.match(reply.text, /pin at checkout/)
   assert.match(reply.text, /Pasig/)
+})
+
+test('the delivery answer never quotes a fee', async () => {
+  // Delivery is priced per order from the pinned dropoff, so any figure stated
+  // up front is a guess — and a customer reads a guess as a promise. The old
+  // copy said "₱99 flat", which stopped being true when live quoting went in.
+  const { deps: d } = deps()
+  const reply = await respondToPayload(PAYLOADS.delivery, d)
+  const fees = reply.text.match(/₱[\d,]+/g) ?? []
+  assert.deepEqual(fees, ['₱1,000'], 'only the free-delivery threshold may appear')
 })
 
 test('asking for a human triggers the handoff exactly once', async () => {

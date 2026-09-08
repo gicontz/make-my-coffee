@@ -8,7 +8,7 @@
 // nobody notices until a customer is quoted the wrong figure.
 
 import { products } from '../products.ts'
-import { FLAT_SHIPPING_FEE } from '../shipping.ts'
+import { FREE_SHIPPING_MIN_SUBTOTAL } from '../shipping.ts'
 import { slotLabel } from '../deliverySlots.ts'
 import { paymentMethodLabel, qrAccountFor } from '../paymentMethods.ts'
 
@@ -78,9 +78,13 @@ function paymentReply(): Reply {
   )
 }
 
+// No fee is quoted here on purpose. Delivery is priced per order from the
+// pinned dropoff (lib/shippingQuote.ts), so any number stated in advance would
+// be a guess — and a guess a customer reads as a promise.
 function deliveryReply(): Reply {
   return menuReply(
-    `Delivery is ₱${FLAT_SHIPPING_FEE} flat, and free to Pasig City on orders of ₱1,000 or more. ` +
+    'We estimate your delivery fee from the exact spot you pin at checkout, so you see the amount before you pay. ' +
+      `Orders of ₱${FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()} or more to Pasig City are delivered free. ` +
       'We deliver between 9:00 AM and 7:00 PM — you pick your time windows at checkout.'
   )
 }
