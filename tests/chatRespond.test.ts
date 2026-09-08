@@ -60,6 +60,14 @@ test('the delivery answer never quotes a fee', async () => {
   assert.deepEqual(fees, ['₱1,000'], 'only the free-delivery threshold may appear')
 })
 
+test('the product list links to the shop, absolutely', async () => {
+  const { deps: d } = deps()
+  const reply = await respondToPayload(PAYLOADS.products, d)
+  // Absolute because the same copy goes to Messenger, where "/shop" is text.
+  assert.match(reply.text, /https?:\/\/[^\s]+\/shop/)
+  for (const p of ['Starter', 'Classic', 'Reserve']) assert.match(reply.text, new RegExp(p))
+})
+
 test('asking for a human triggers the handoff exactly once', async () => {
   const { deps: d, calls } = deps()
   await respondToPayload(PAYLOADS.human, d)

@@ -20,7 +20,7 @@ export default function Footer() {
           <div>
             <h4 className="text-espresso-200 font-semibold text-xs tracking-widest uppercase mb-3">Quick Links</h4>
             <ul className="space-y-2">
-              {[['/', 'Home'], ['/shop', 'Shop'], ['/cart', 'Cart']].map(([href, label]) => (
+              {[['/', 'Home'], ['/shop', 'Shop'], ['/cart', 'Cart'], ['/contact', 'Contact'], ['/privacy', 'Privacy']].map(([href, label]) => (
                 <li key={href}>
                   <Link href={href} className="text-espresso-400 hover:text-espresso-300 text-sm transition-colors">{label}</Link>
                 </li>

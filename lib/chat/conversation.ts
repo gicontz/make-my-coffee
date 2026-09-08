@@ -9,6 +9,7 @@
 
 import { products } from '../products.ts'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '../shipping.ts'
+import { siteUrl } from '../siteUrl.ts'
 import { slotLabel } from '../deliverySlots.ts'
 import { paymentMethodLabel, qrAccountFor } from '../paymentMethods.ts'
 
@@ -60,8 +61,12 @@ export function greeting(): Reply {
 
 function productsReply(): Reply {
   const lines = products.map(p => `• ${p.name} — ${p.shots} shots / ${p.volume} — ₱${p.price.toLocaleString()}`)
+  // Absolute, not `/shop`: the same copy goes to Messenger, where a relative
+  // path is just text. The widget linkifies it either way.
   return menuReply(
-    `We bottle one blend, Aconchego, in three sizes:\n\n${lines.join('\n')}\n\nEach shot is 30ml — mix your own latte, iced coffee, whatever you like.`
+    `We bottle one blend, Aconchego, in three sizes:\n\n${lines.join('\n')}\n\n` +
+      `Each shot is 30ml — mix your own latte, iced coffee, whatever you like.\n\n` +
+      `Browse and order here: ${siteUrl()}/shop`
   )
 }
 
