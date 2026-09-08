@@ -5,6 +5,10 @@ import nodemailer from 'nodemailer'
 import { slotLabel } from './deliverySlots.ts'
 import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from './paymentMethods.ts'
 import type { AppliedVoucher } from './vouchers.ts'
+// Email clients have no page context, so relative paths are dead — and the QR
+// lives at a stable /qr/... path (not a hashed /_next/static one) precisely so
+// an email sent today still renders its image after the next deploy.
+import { siteUrl } from './siteUrl.ts'
 
 interface OrderItem {
   id: string
@@ -244,14 +248,6 @@ function infoBox(bg: string, border: string, inner: string): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;background:${bg};border:1px solid ${border};border-radius:12px;">
       <tr><td bgcolor="${bg}" style="background:${bg};padding:16px 20px;">${inner}</td></tr>
     </table>`
-}
-
-// Absolute base for anything the email has to link or load. Email clients have
-// no page context, so relative paths are dead — and the QR lives at a stable
-// /qr/... path (not a hashed /_next/static one) precisely so an email sent
-// today still renders its image after the next deploy.
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_URL || 'https://makemycoffee.cafe').replace(/\/+$/, '')
 }
 
 // The "how to pay" block. COD keeps its original wording; the QR wallets get

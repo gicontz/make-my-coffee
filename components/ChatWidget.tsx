@@ -231,6 +231,33 @@ export default function ChatWidget() {
   )
 }
 
+// Bot copy carries links — the shop, for one — and a bare URL rendered as text
+// is a URL nobody can follow on a phone. Split rather than inject: this is
+// still model-adjacent output, and dangerouslySetInnerHTML on it would be an
+// injection hole for the price of an anchor tag.
+const URL_RE = /(https?:\/\/[^\s<>()]+[^\s<>().,!?])/g
+
+function linkify(body: string) {
+  // The split keeps the captured URLs as their own entries, so a plain prefix
+  // check identifies them. Deliberately not URL_RE.test() — a /g regex carries
+  // lastIndex between calls and would match every other time.
+  return body.split(URL_RE).map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2 font-semibold break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  )
+}
+
 function Bubble({ role, body }: { role: Message['role']; body: string }) {
   const mine = role === 'visitor'
   return (
@@ -249,7 +276,7 @@ function Bubble({ role, body }: { role: Message['role']; body: string }) {
             Make My Coffee
           </span>
         )}
-        {body}
+        {linkify(body)}
       </div>
     </div>
   )
