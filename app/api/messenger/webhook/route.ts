@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { waitUntil } from '@vercel/functions'
 import { sendAdminNotice } from '@/lib/email'
-import { assistantReply } from '@/lib/messenger/assistant'
+import { assistantReply } from '@/lib/chat/assistant'
 import {
   fallbackReply,
-  formatOrderStatus,
   greeting,
-  orderNotFoundReply,
-  parseOrderReference,
-  payloadForText,
-  rateLimitedReply,
   receiptAcknowledgement,
-  replyForPayload,
   type Reply,
-} from '@/lib/messenger/conversation'
+} from '@/lib/chat/conversation'
+import { respondToPayload, respondToText, type RespondDeps } from '@/lib/chat/respond'
 import { sendReply, sendTypingOn } from '@/lib/messenger/send'
 import { verificationChallenge, verifyWebhookSignature } from '@/lib/messenger/signature'
 import { claimEvent, lookupOrder, verifiedOrderFor } from '@/lib/messenger/store'
@@ -113,13 +108,26 @@ async function handleEvent(event: MessagingEvent): Promise<void> {
   )
 }
 
+// Messenger's half of the contract in lib/chat/respond.ts. The decision
+// sequence itself is shared with the on-site widget — only where the state
+// lives differs, and here it is keyed on the PSID.
+function depsFor(psid: string): RespondDeps {
+  return {
+    lookupOrder: ref => lookupOrder(psid, ref),
+    verifiedOrder: () => verifiedOrderFor(psid),
+    // Nothing to do: a Messenger thread is already sitting in the Page inbox
+    // for a human to pick up. The widget has to work harder for this.
+    onThinking: () => sendTypingOn(psid),
+  }
+}
+
 async function composeReply(psid: string, event: MessagingEvent): Promise<Reply | null> {
   // A tapped button or quick reply — deterministic, and the common case.
   const payload = event.postback?.payload ?? event.message?.quick_reply?.payload
   if (payload) {
     // get_started is what Meta sends on a first-ever conversation.
     if (payload === 'get_started') return greeting()
-    return replyForPayload(payload) ?? fallbackReply()
+    return respondToPayload(payload, depsFor(psid))
   }
 
   const attachments = event.message?.attachments
@@ -130,31 +138,7 @@ async function composeReply(psid: string, event: MessagingEvent): Promise<Reply 
   const text = event.message?.text?.trim()
   if (!text) return null
 
-  const keyword = payloadForText(text)
-  if (keyword) return replyForPayload(keyword)
-
-  // "#41 juan@example.com" — both halves, or it isn't a lookup.
-  const ref = parseOrderReference(text)
-  if (ref) {
-    const result = await lookupOrder(psid, ref)
-    if (result.ok) return { text: formatOrderStatus(result.order) }
-    return result.reason === 'rate_limited' ? rateLimitedReply() : orderNotFoundReply()
-  }
-
-  // Everything else goes to the model, which may call back into the same
-  // authorised lookup. A null answer — no key, a refusal, a failure, a loop
-  // that ran long — degrades to the menu.
-  await sendTypingOn(psid)
-  const verifiedOrder = await verifiedOrderFor(psid).catch(() => null)
-  const answer = await assistantReply(text, {
-    verifiedOrder,
-    lookupOrder: async (orderId, email) => {
-      const result = await lookupOrder(psid, { orderId, email })
-      return result.ok ? result.order : null
-    },
-  })
-
-  return answer ?? fallbackReply()
+  return respondToText(text, depsFor(psid))
 }
 
 async function handleAttachment(psid: string, attachments: Attachment[]): Promise<Reply> {

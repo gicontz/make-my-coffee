@@ -17,9 +17,9 @@ import {
   payloadForText,
   replyForPayload,
   type TrackableOrder,
-} from '../lib/messenger/conversation.ts'
+} from '../lib/chat/conversation.ts'
 import { truncate } from '../lib/messenger/send.ts'
-import { LOOKUP_WINDOW_MINUTES, MAX_FAILED_LOOKUPS, isRateLimited, nextAttemptWindow } from '../lib/messenger/rateLimit.ts'
+import { LOOKUP_WINDOW_MINUTES, MAX_FAILED_LOOKUPS, isRateLimited, nextAttemptWindow } from '../lib/chat/rateLimit.ts'
 
 const SECRET = 'app-secret'
 const BODY = '{"object":"page","entry":[]}'

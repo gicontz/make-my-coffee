@@ -105,6 +105,35 @@ triggered it.
 Until step 4 passes, leave `RESEND_API_KEY` unset — sends against an unverified
 domain are rejected outright, and the Gmail fallback keeps working meanwhile.
 
+## On-site chat
+The widget on the storefront (`components/ChatWidget.tsx`) talks to our own
+backend, not to Meta. `POST /api/chat` runs the same decision sequence the
+Messenger webhook does — `lib/chat/respond.ts` is the single implementation, and
+a second copy of it is the bug to watch for.
+
+| Piece | File |
+|---|---|
+| Widget | `components/ChatWidget.tsx` |
+| Endpoint | `app/api/chat/route.ts` |
+| Shared bot brain | `lib/chat/respond.ts`, `conversation.ts`, `assistant.ts` |
+| Storage, lookups, budgets | `lib/chat/store.ts` (migration 0007) |
+| Staff inbox | `/admin/chat` |
+
+**Visitor identity is an httpOnly cookie**, minted server-side — Messenger's PSID
+has no web equivalent and there is no API to mint one. It authenticates nothing;
+it means "same browser". Order lookups still demand the order number **and** the
+email on that order.
+
+**`/api/chat` is public with nothing in front of it.** That is why
+`lib/chat/budget.ts` exists: a per-session daily cap and a global daily ceiling
+on model calls, both degrading to the button menu rather than erroring. Without
+them the endpoint is free compute for whoever finds it.
+
+⚠️ **Nothing pushes a chat to anyone's phone.** A visitor asking for a person
+flags the session and sends one email to `ADMIN_EMAIL`. If chats sit unanswered,
+the honest fix is a real notification path or dropping live chat and offering
+only the bot — not leaving the widget promising a reply nobody sees.
+
 ## Messenger chat + bot
 An m.me chat launcher on the storefront, plus a webhook-backed bot. Issue #11
 has the full credential walkthrough; this is the shape of it.

@@ -3,6 +3,7 @@ import { Playfair_Display, Work_Sans } from 'next/font/google'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import ChatWidget from '@/components/ChatWidget'
 import { CartProvider } from '@/context/CartContext'
 
 const playfair = Playfair_Display({
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main className="pt-16">{children}</main>
           <Footer />
+          {/* Hidden on /order and /admin — see the component. */}
+          <ChatWidget />
         </CartProvider>
       </body>
     </html>
