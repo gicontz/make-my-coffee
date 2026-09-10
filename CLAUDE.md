@@ -213,5 +213,6 @@ page is wrong until it is updated.
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
 - Shipping is quoted live per order from the customer's pinned dropoff (`lib/shippingQuote.ts`); free for Pasig City orders ≥ ₱1,000, and the flat ₱99 in `lib/shipping.ts` is only the fallback when a quote can't be got
+- Free-delivery vouchers waive at most **₱150** (`FREE_SHIPPING_VOUCHER_CAP`); the customer pays any excess, and the voucher is still labelled "Free delivery". Always price it with `shippingAfterVoucher()` — never `freeShipping ? 0 : fee` (D11a)
 - **Never state a delivery fee in customer-facing copy.** It isn't knowable ahead of the pin — see the comment on `deliveryReply()`
 - Currency is PHP (`₱`), integer pesos — no cents (D1)

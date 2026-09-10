@@ -74,6 +74,40 @@ export function voucherLabel(v: Pick<Voucher, 'discount_type' | 'discount_value'
   }
 }
 
+/**
+ * The most a free-delivery voucher will waive, in pesos.
+ *
+ * Delivery is quoted live per order from the pinned dropoff, so an uncapped
+ * free-delivery voucher writes a blank cheque: a far address can quote several
+ * hundred pesos and the voucher would swallow all of it, on an order whose
+ * margin is a fraction of that. The cap bounds what one code can cost us
+ * while still covering the ordinary delivery outright.
+ *
+ * The voucher stays *labelled* "Free delivery" — that is the promotion being
+ * offered. What must never happen is the shipping line saying "Free" while the
+ * customer is charged the excess; every surface that renders it uses
+ * `shippingAfterVoucher()` below and shows the real figure.
+ */
+export const FREE_SHIPPING_VOUCHER_CAP = 150
+
+/**
+ * What the customer actually pays for delivery once a voucher is applied.
+ *
+ * One implementation, used by the checkout preview, the authoritative pricing
+ * in POST /api/orders, and the confirmation email — three places that
+ * previously each wrote `freeShipping ? 0 : fee` and would now each need the
+ * same cap remembering.
+ */
+export function shippingAfterVoucher(fee: number, freeShipping: boolean): number {
+  if (!freeShipping) return fee
+  return Math.max(0, fee - FREE_SHIPPING_VOUCHER_CAP)
+}
+
+/** How much of the delivery fee the voucher absorbed — what the promo cost us. */
+export function freeShippingSubsidy(fee: number, freeShipping: boolean): number {
+  return fee - shippingAfterVoucher(fee, freeShipping)
+}
+
 // What the voucher takes off *this* subtotal. Never exceeds the subtotal (a
 // ₱500-off voucher on a ₱299 cart discounts ₱299, not ₱500 — the order total
 // floors at the shipping fee, it never goes negative or turns into a refund).

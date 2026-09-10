@@ -17,6 +17,9 @@ import {
   normalizeCode,
   voucherLabel,
   type Voucher,
+  FREE_SHIPPING_VOUCHER_CAP,
+  shippingAfterVoucher,
+  freeShippingSubsidy,
 } from '../lib/vouchers.ts'
 import { validateVoucherInput } from '../lib/voucherInput.ts'
 
@@ -185,4 +188,47 @@ test('validateVoucherInput rejects unusable numbers but accepts blanks as "unset
 
 test('validateVoucherInput rejects an unknown discount type', () => {
   assert.ok(validateVoucherInput({ code: 'AAA', discount_type: 'buy_one_get_one', discount_value: 1 }).error)
+})
+
+// ── Capped free delivery ──────────────────────────────────────────────────
+//
+// Delivery is quoted live per order, so an uncapped free-delivery voucher is a
+// blank cheque — a far address can quote several hundred pesos against an
+// order whose margin is a fraction of that. The cap bounds the promo. What it
+// must never do is quietly change what the customer is charged without every
+// surface agreeing on the figure, which is why there is one helper and not
+// three copies of `freeShipping ? 0 : fee`.
+
+test('an ordinary delivery is still fully covered', () => {
+  assert.equal(shippingAfterVoucher(99, true), 0)
+  assert.equal(shippingAfterVoucher(FREE_SHIPPING_VOUCHER_CAP, true), 0)
+})
+
+test('the customer pays only the excess above the cap', () => {
+  assert.equal(shippingAfterVoucher(250, true), 250 - FREE_SHIPPING_VOUCHER_CAP)
+  assert.equal(shippingAfterVoucher(400, true), 400 - FREE_SHIPPING_VOUCHER_CAP)
+})
+
+test('the fee is untouched without a free-delivery voucher', () => {
+  assert.equal(shippingAfterVoucher(250, false), 250)
+  assert.equal(shippingAfterVoucher(0, false), 0)
+})
+
+test('the charge never goes negative and never becomes a refund', () => {
+  // A ₱50 delivery against a ₱150 cap waives ₱50, not ₱150 — the difference
+  // must not leak out as credit against the rest of the order.
+  assert.equal(shippingAfterVoucher(50, true), 0)
+  assert.equal(freeShippingSubsidy(50, true), 50)
+})
+
+test('the recorded subsidy is what the promo actually cost, not the whole quote', () => {
+  // This figure lands on the redemption row and is what reporting adds up.
+  assert.equal(freeShippingSubsidy(400, true), FREE_SHIPPING_VOUCHER_CAP)
+  assert.equal(freeShippingSubsidy(99, true), 99)
+  assert.equal(freeShippingSubsidy(400, false), 0)
+})
+
+test('the voucher is still tagged as free delivery', () => {
+  // The cap changes what is charged, not what the promotion is called.
+  assert.equal(voucherLabel(v({ discount_type: 'free_shipping' })), 'Free delivery')
 })

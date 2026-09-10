@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { voucherLabel, type DiscountType, type Voucher } from '@/lib/vouchers'
+import { FREE_SHIPPING_VOUCHER_CAP, voucherLabel, type DiscountType, type Voucher } from '@/lib/vouchers'
 
 /* ── Manila time ─────────────────────────────────────────────────────────
    <input type="datetime-local"> has no timezone — the browser reads and
@@ -95,7 +95,7 @@ function formFrom(v: Voucher): FormState {
 const TYPE_OPTIONS: { value: DiscountType; label: string; hint: string }[] = [
   { value: 'percent', label: '% off', hint: 'Percentage off the items subtotal' },
   { value: 'fixed', label: '₱ off', hint: 'Fixed peso amount off the items subtotal' },
-  { value: 'free_shipping', label: 'Free delivery', hint: 'Waives the delivery fee' },
+  { value: 'free_shipping', label: 'Free delivery', hint: `Waives up to ₱${FREE_SHIPPING_VOUCHER_CAP} of the delivery fee` },
 ]
 
 const inputCls =
