@@ -19,14 +19,22 @@ export default function AdminLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-      if (res.ok) {
-        router.push('/admin/dashboard')
-      } else {
+      if (!res.ok) {
         setError('Invalid username or password.')
+        setLoading(false)
+        return
       }
+      // Deliberately no setLoading(false) here, and no finally.
+      //
+      // router.push() starts the navigation and returns immediately — the
+      // dashboard is server-rendered on demand, so the page does not change
+      // until its payload arrives. Clearing the flag at this point put the
+      // button back to "Sign In" and left the operator staring at an
+      // apparently idle form for the whole wait. The button stays disabled
+      // and saying "Signing in…" until the new page replaces it.
+      router.push('/admin/dashboard')
     } catch {
       setError('Something went wrong. Try again.')
-    } finally {
       setLoading(false)
     }
   }
