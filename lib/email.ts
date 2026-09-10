@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer'
 // the `@/` alias is a bundler concern that plain node knows nothing about.
 import { slotLabel } from './deliverySlots.ts'
 import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from './paymentMethods.ts'
-import type { AppliedVoucher } from './vouchers.ts'
+import { FREE_SHIPPING_VOUCHER_CAP, type AppliedVoucher } from './vouchers.ts'
 // Email clients have no page context, so relative paths are dead — and the QR
 // lives at a stable /qr/... path (not a hashed /_next/static one) precisely so
 // an email sent today still renders its image after the next deploy.
@@ -214,9 +214,15 @@ function totalsTable(
          <td style="${td}text-align:right;color:#16a34a;font-weight:600;">− ₱${discount.toLocaleString()}</td>
        </tr>`
     : ''
+  // When a free-delivery voucher covers the whole fee, say Free. When the cap
+  // covered only part of it, name the amount charged and the amount waived —
+  // an email that says "Free" beside a total the customer was charged for
+  // delivery is how a support conversation starts.
   const shippingValue = shipping === 0
     ? (voucher?.freeShipping ? `<span style="color:#16a34a;font-weight:600;">Free (${voucher.code})</span>` : freeHtml)
-    : '₱' + shipping
+    : voucher?.freeShipping
+      ? `₱${shipping} <span style="color:#16a34a;font-weight:600;">(₱${FREE_SHIPPING_VOUCHER_CAP} off, ${voucher.code})</span>`
+      : '₱' + shipping
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
       <tr><td style="${td}">Subtotal</td><td style="${td}text-align:right;">₱${subtotal.toLocaleString()}</td></tr>

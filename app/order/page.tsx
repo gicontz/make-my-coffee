@@ -9,7 +9,7 @@ import bottleImg from '@/app/assets/bottle.png'
 import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
-import { isValidCode, normalizeCode, type AppliedVoucher } from '@/lib/vouchers'
+import { FREE_SHIPPING_VOUCHER_CAP, isValidCode, normalizeCode, shippingAfterVoucher, type AppliedVoucher } from '@/lib/vouchers'
 import {
   CHECKOUT_PAYMENT_METHODS, DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor,
   type CheckoutPaymentMethod,
@@ -79,7 +79,8 @@ export default function OrderPage() {
   const [checkingVoucher, setCheckingVoucher] = useState(false)
 
   const quotedShipping = shippingQuote?.fee ?? FLAT_SHIPPING_FEE
-  const shipping = voucher?.freeShipping ? 0 : quotedShipping
+  // A preview only — POST /api/orders recomputes this with the same helper.
+  const shipping = shippingAfterVoucher(quotedShipping, !!voucher?.freeShipping)
   const discount = voucher?.discount ?? 0
   const orderTotal = total - discount + shipping
 
@@ -744,9 +745,23 @@ export default function OrderPage() {
                             )}
                             Free
                           </>
+                        ) : voucher?.freeShipping ? (
+                          /* The voucher covered part of it but not all. Showing
+                             "Free" here would be a straight lie about the money
+                             — the struck-through original plus the real charge
+                             is the only honest rendering. */
+                          <>
+                            <span className="text-espresso-300 line-through font-normal mr-1.5">₱{quotedShipping}</span>
+                            ₱{shipping}
+                          </>
                         ) : `₱${shipping}`}
                       </span>
                     </div>
+                    {!quoting && voucher?.freeShipping && shipping > 0 && (
+                      <p className="text-green-600 text-xs text-right mt-0.5">
+                        ₱{FREE_SHIPPING_VOUCHER_CAP} of delivery covered by {voucher.code}
+                      </p>
+                    )}
                     {!quoting && shippingQuote?.source === 'lalamove' && (
                       <p className="text-espresso-400 text-xs text-right mt-0.5">
                         Live rider pricing{shippingQuote.distanceKm != null ? ` · ${shippingQuote.distanceKm.toFixed(1)} km` : ''}

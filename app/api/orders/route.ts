@@ -4,7 +4,7 @@ import { sendOrderEmails } from '@/lib/email'
 import { getShippingFee } from '@/lib/shippingQuote'
 import { validateDeliverySlots } from '@/lib/deliverySlots'
 import { priceOrderItems } from '@/lib/products'
-import { applyVoucher, type AppliedVoucher } from '@/lib/vouchers'
+import { applyVoucher, freeShippingSubsidy, shippingAfterVoucher, type AppliedVoucher } from '@/lib/vouchers'
 import { attachOrder, claimVoucher, findVoucherByCode, releaseVoucher } from '@/lib/voucherStore'
 import { DEFAULT_PAYMENT_METHOD, isCheckoutPaymentMethod } from '@/lib/paymentMethods'
 
@@ -86,8 +86,10 @@ export async function POST(request: NextRequest) {
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 422 })
 
       // Total pesos forgone, recorded on the redemption for reporting: the
-      // subtotal discount plus any delivery fee the voucher waives.
-      const forgone = result.applied.discount + (result.applied.freeShipping ? shippingQuote.fee : 0)
+      // subtotal discount plus however much of the delivery fee the voucher
+      // actually absorbed — capped, so this is what the promo cost us rather
+      // than the whole quote.
+      const forgone = result.applied.discount + freeShippingSubsidy(shippingQuote.fee, result.applied.freeShipping)
 
       const claim = await claimVoucher(voucher, customer.email ?? '', forgone)
       if ('error' in claim) return NextResponse.json({ error: claim.error }, { status: 409 })
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const discount = applied?.discount ?? 0
-    const shipping = applied?.freeShipping ? 0 : shippingQuote.fee
+    const shipping = shippingAfterVoucher(shippingQuote.fee, !!applied?.freeShipping)
     const total = subtotal - discount + shipping
 
     let orderId: number

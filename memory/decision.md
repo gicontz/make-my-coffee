@@ -236,6 +236,32 @@ the browser may preview a price, only the server may decide one.
   `/admin/:path*` — pages — so it does not cover any `/api/admin/*` route. See
   the open items below.
 
+## D11a — A free-delivery voucher waives at most ₱150
+**Decision:** `free_shipping` vouchers subsidise up to `FREE_SHIPPING_VOUCHER_CAP`
+(₱150) of the delivery fee. The customer pays any excess. The voucher is still
+*labelled* "Free delivery" everywhere it is named.
+**Why:** delivery stopped being a flat ₱99 when live quoting went in (D9) — it
+is now priced per order from the pinned dropoff. An uncapped free-delivery
+voucher is therefore a blank cheque: a far address can quote several hundred
+pesos against an order whose margin is a fraction of that. ₱150 covers an
+ordinary delivery outright while bounding what one code can cost.
+**Implications:**
+- One helper, `shippingAfterVoucher()`, is used by the checkout preview, the
+  authoritative pricing in `POST /api/orders`, and the confirmation email.
+  Three separate `freeShipping ? 0 : fee` expressions is how the cap would get
+  remembered in two places and forgotten in the third.
+- **The label and the money are allowed to differ; the money is never allowed
+  to lie.** When the cap covers the whole fee the shipping line says "Free". When
+  it does not, the line shows the original struck through, the real charge, and
+  what the voucher absorbed. A summary reading "Free" beside a total the
+  customer was charged delivery for is the failure mode this guards against.
+- The `forgone` figure on the redemption row now records the *capped* subsidy —
+  what the promo actually cost — not the whole quote.
+- The e2e suite cannot exercise the over-cap path: without Lalamove credentials
+  it falls back to the flat ₱99, which is under the cap. The arithmetic is
+  covered by unit tests instead, and the display was verified in a browser
+  against a stubbed ₱320 quote.
+
 ## D12 — Order money is re-derived from the catalog, not the request
 **Decision:** `POST /api/orders` ignores the posted `subtotal` and the posted
 per-item prices entirely. `priceOrderItems()` (`lib/products.ts`) re-prices the
