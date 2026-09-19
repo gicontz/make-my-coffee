@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
 const nav = [
@@ -47,7 +48,15 @@ const nav = [
   },
 ]
 
-export default function Sidebar() {
+/**
+ * Permanent rail from `lg` up; a drawer below it.
+ *
+ * At 390px the fixed 224px rail left about 166px for content — every label
+ * wrapped, a status pill broke across four lines, and the filter tabs stacked
+ * one per row. Off-canvas is the only way a rail this wide coexists with a
+ * phone.
+ */
+export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -56,8 +65,30 @@ export default function Sidebar() {
     router.push('/admin/login')
   }
 
+  // Escape closes it, as any overlay should.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   return (
-    <aside className="fixed inset-y-0 left-0 w-56 bg-espresso-900 flex flex-col z-40">
+    <>
+      {/* Scrim, mobile only — the rail is permanent from lg up, where there is
+          nothing to dismiss. */}
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className={`fixed inset-0 z-30 bg-espresso-900/60 lg:hidden transition-opacity ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 w-56 bg-espresso-900 flex flex-col z-40 transition-transform lg:translate-x-0 ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
       {/* Brand */}
       <div className="px-6 py-5 border-b border-espresso-800">
         <p className="text-espresso-400 text-[10px] font-semibold tracking-widest uppercase">Make My Coffee</p>
@@ -72,6 +103,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
                   ? 'bg-espresso-800 text-espresso-50'
@@ -99,6 +131,7 @@ export default function Sidebar() {
           Logout
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

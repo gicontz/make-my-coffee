@@ -209,6 +209,20 @@ collection list mirrors the `orders` and `chat_*` tables, and the processor list
 is every external host the app talks to. Add a processor or a column and that
 page is wrong until it is updated.
 
+## Admin backoffice
+`app/admin/*` renders inside `components/admin/AdminShell.tsx` — a permanent
+sidebar from `lg` up, an off-canvas drawer below it, and a mobile top bar with
+the hamburger. `/admin/login` opts out of the chrome entirely.
+
+**The storefront's navbar, footer, cart and chat widget live in the
+`(storefront)` route group**, not the root layout, so none of them reach
+/admin. A route group changes no URLs — `/`, `/shop`, `/cart`, `/order`,
+`/contact` and `/privacy` are exactly where they were.
+
+⚠️ **Never run `next build` while `next dev` is running** on this project. The
+build overwrites `.next` and the dev server then serves `Cannot find module
+'./948.js'` error pages that look like real renders to a screenshot script.
+
 ## Delivery date & time
 Checkout captures a **required delivery date** (`lib/deliveryDate.ts`) alongside
 the time windows (`lib/deliverySlots.ts`). Stored on `orders.delivery_date`
@@ -229,6 +243,12 @@ otherwise post yesterday.
 Render it with `formatDeliveryDate()`, which formats in UTC against a
 UTC-constructed date so the day stored is the day printed; formatting a bare
 date in a named zone is the classic off-by-one.
+
+⚠️ **Always read it as `delivery_date::text`.** The neon driver parses a `DATE`
+into a JS `Date` at the *machine's* local midnight, so `2026-09-23` arrives as
+`2026-09-22T16:00:00Z` in Manila and `2026-09-23T00:00:00Z` on Vercel. Once
+JSON-serialised, the first reads back as the wrong day — a bug that only
+appears in one environment. The cast keeps every zone out of it.
 
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side

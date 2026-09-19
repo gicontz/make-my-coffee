@@ -87,7 +87,7 @@ export async function lookupOrder(session: ChatSession, ref: OrderReference): Pr
   if (isRateLimited(session)) return { ok: false, reason: 'rate_limited' }
 
   const rows = await sql`
-    SELECT id, order_status, payment_status, payment_method, total, delivery_date, delivery_slots, created_at
+    SELECT id, order_status, payment_status, payment_method, total, delivery_date::text AS delivery_date, delivery_slots, created_at
     FROM orders
     WHERE id = ${ref.orderId} AND LOWER(email) = LOWER(${ref.email})
   `
@@ -112,7 +112,7 @@ export async function lookupOrder(session: ChatSession, ref: OrderReference): Pr
 
 export async function verifiedOrderFor(sessionId: string): Promise<TrackableOrder | null> {
   const rows = await sql`
-    SELECT o.id, o.order_status, o.payment_status, o.payment_method, o.total, o.delivery_date, o.delivery_slots, o.created_at
+    SELECT o.id, o.order_status, o.payment_status, o.payment_method, o.total, o.delivery_date::text AS delivery_date, o.delivery_slots, o.created_at
     FROM chat_sessions s
     JOIN orders o ON o.id = s.verified_order_id
     WHERE s.id = ${sessionId}
