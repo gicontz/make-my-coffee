@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const changed = await sql`
       UPDATE orders SET order_status = ${order_status}, updated_at = NOW()
       WHERE id = ${id} AND order_status <> ${order_status}
-      RETURNING *
+      RETURNING *, delivery_date::text AS delivery_date
     `
 
     // Fire-and-forget, same discipline as the order confirmation (D5): a mail
@@ -71,6 +71,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
   }
 
-  const rows = await sql`SELECT * FROM orders WHERE id = ${id}`
+  // ::text on the date — see app/api/admin/orders/route.ts for why. Without
+  // it the status email's row mapper sees a Date, not a YYYY-MM-DD string,
+  // rejects it, and the shipped/delivered notice silently loses the delivery
+  // day it exists to communicate.
+  const rows = await sql`SELECT *, delivery_date::text AS delivery_date FROM orders WHERE id = ${id}`
   return NextResponse.json(rows[0])
 }

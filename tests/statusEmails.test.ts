@@ -106,6 +106,20 @@ test('the delivery date carries through, and its absence is null not a guess', (
   }
 })
 
+test('a Date from the driver is rejected rather than rendered as the wrong day', () => {
+  // The neon driver parses a DATE into a JS Date at the machine's local
+  // midnight, so 2026-09-20 arrives as 2026-09-19T16:00:00Z in Manila. Anything
+  // that sliced the first ten characters off that would print the 19th. The
+  // queries cast to text so this never arrives — and if one is ever added
+  // without the cast, the date drops out of the email rather than lying about
+  // it, which is the failure we can live with.
+  const asDate = statusEmailFromOrderRow(
+    { ...ROW, delivery_date: new Date('2026-09-19T16:00:00.000Z') },
+    'shipped'
+  )
+  assert.equal(asDate.deliveryDate, null)
+})
+
 test('a null delivery_slots becomes an empty list, not a crash', () => {
   assert.deepEqual(statusEmailFromOrderRow({ ...ROW, delivery_slots: null }, 'shipped').deliverySlots, [])
 })

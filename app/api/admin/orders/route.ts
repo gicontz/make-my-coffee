@@ -9,6 +9,13 @@ import { sql } from '@/lib/db'
 // actually is. The other admin GET routes already declare this.
 export const dynamic = 'force-dynamic'
 
+// Every query below re-selects delivery_date cast to text. The neon driver
+// parses a DATE into a JS Date at the *machine's* local midnight, so
+// 2026-09-23 arrives as 2026-09-22T16:00:00Z in Manila and 2026-09-23T00:00:00Z
+// on Vercel. Serialised to JSON, the first of those reads back as the wrong
+// day — a bug that would only appear in one environment. Asking Postgres for
+// the text keeps every zone out of it.
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -16,11 +23,11 @@ export async function GET(request: NextRequest) {
 
     const rows = status && status !== 'all'
       ? await sql`
-          SELECT * FROM orders
+          SELECT *, delivery_date::text AS delivery_date FROM orders
           WHERE order_status = ${status}
           ORDER BY created_at DESC
         `
-      : await sql`SELECT * FROM orders ORDER BY created_at DESC`
+      : await sql`SELECT *, delivery_date::text AS delivery_date FROM orders ORDER BY created_at DESC`
 
     return NextResponse.json(rows)
   } catch (err) {

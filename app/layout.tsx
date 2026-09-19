@@ -1,10 +1,6 @@
 import type { Metadata } from 'next'
 import { Playfair_Display, Work_Sans } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/Navbar'
-import Footer from '@/components/Footer'
-import ChatWidget from '@/components/ChatWidget'
-import { CartProvider } from '@/context/CartContext'
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -27,14 +23,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${playfair.variable} ${workSans.variable}`}>
+      {/* Nothing but the document shell lives here. The shop's navbar, footer,
+          cart and chat widget belong to the (storefront) route group; /admin
+          brings its own chrome and should inherit none of it. */}
       <body className="bg-espresso-50 text-espresso-900 antialiased" style={{ fontFamily: 'var(--font-work-sans), system-ui, sans-serif' }}>
-        <CartProvider>
-          <Navbar />
-          <main className="pt-16">{children}</main>
-          <Footer />
-          {/* Hidden on /order and /admin — see the component. */}
-          <ChatWidget />
-        </CartProvider>
+        {children}
       </body>
     </html>
   )
