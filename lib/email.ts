@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer'
 // under `node --experimental-strip-types` for tests/statusEmails.test.ts, and
 // the `@/` alias is a bundler concern that plain node knows nothing about.
 import { slotLabel } from './deliverySlots.ts'
+import { formatDeliveryDate } from './deliveryDate.ts'
 import { DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor } from './paymentMethods.ts'
 import { FREE_SHIPPING_VOUCHER_CAP, type AppliedVoucher } from './vouchers.ts'
 // Email clients have no page context, so relative paths are dead — and the QR
@@ -37,6 +38,8 @@ export interface OrderEmailData {
   discount: number
   shipping: number
   total: number
+  /** The calendar day the customer asked for, as YYYY-MM-DD. */
+  deliveryDate?: string | null
   deliverySlots?: string[]
   voucher?: AppliedVoucher | null
   /** What the customer picked at checkout. Never a claim that they paid. */
@@ -235,6 +238,20 @@ function totalsTable(
     </table>`
 }
 
+/**
+ * The delivery window as one human phrase: the day first, then the hours.
+ *
+ * Both halves or neither — an order from before dates were captured has slots
+ * but no date, and "9:00 – 10:00 AM" with no day attached is exactly the
+ * ambiguity the date was added to remove, so the day leads when it exists.
+ */
+function deliveryWhen(date: string | null | undefined, slots: string[] | undefined): string | null {
+  const windows = slots?.length ? [...slots].sort().map(slotLabel).join(', ') : null
+  if (date && windows) return `${formatDeliveryDate(date)} · ${windows}`
+  if (date) return formatDeliveryDate(date)
+  return windows
+}
+
 // Padded-cell button: padding lives on the <td> (Outlook honors it there,
 // not on <a>). Corners round everywhere except Outlook, which squares them.
 function button(href: string, label: string): string {
@@ -343,9 +360,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
   const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
   const isQr = qrAccountFor(paymentMethod) !== null
   const customerName = `${customer.firstName} ${customer.lastName}`
-  const deliveryWindow = deliverySlots?.length
-    ? [...deliverySlots].sort().map(slotLabel).join(', ')
-    : null
+  const deliveryWindow = deliveryWhen(data.deliveryDate, deliverySlots)
 
   const bcc = staffBcc()
 
@@ -369,7 +384,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
         ${detailRow('Address', customer.address)}
         ${customer.barangay ? detailRow('Barangay', customer.barangay) : ''}
         ${detailRow('City', `${customer.city}, ${customer.province} ${customer.postalCode}`)}
-        ${deliveryWindow ? detailRow('Delivery Time', deliveryWindow) : ''}
+        ${deliveryWindow ? detailRow('Delivery', deliveryWindow) : ''}
         ${detailRow('Payment', isQr
           ? `<strong>${paymentMethodLabel(paymentMethod)}</strong> — customer says they'll pay by QR. Unverified: confirm the money landed before marking this paid.`
           : `<strong>${paymentMethodLabel(paymentMethod)}</strong>`)}
@@ -411,7 +426,7 @@ export async function sendOrderEmails(data: OrderEmailData) {
       ${deliveryWindow ? infoBox(
         '#FAF6F1',
         '#F0E2D0',
-        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery Time</p>
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery</p>
          <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
       ) : ''}
 
@@ -453,6 +468,7 @@ export interface OrderStatusEmailData {
     postalCode: string
   }
   total: number
+  deliveryDate?: string | null
   deliverySlots?: string[]
   paymentMethod?: string
   /** 'paid' suppresses the payment reminder; anything else keeps it. */
@@ -482,6 +498,10 @@ export function statusEmailFromOrderRow(
       postalCode: str(row.postal_code),
     },
     total: Number(row.total ?? 0),
+    // A DATE column comes back as YYYY-MM-DD from the neon driver; anything
+    // else drops out — including an empty string, which is a string but is not
+    // a date, and would render as a blank "Arriving" line in the email.
+    deliveryDate: typeof row.delivery_date === 'string' && row.delivery_date ? row.delivery_date : null,
     deliverySlots: Array.isArray(row.delivery_slots) ? (row.delivery_slots as string[]) : [],
     paymentMethod: str(row.payment_method) || DEFAULT_PAYMENT_METHOD,
     paymentStatus: str(row.payment_status) || 'unpaid',
@@ -510,9 +530,7 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
   const { orderId, status, customer, total, deliverySlots, paymentStatus } = data
   const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
   const copy = STATUS_COPY[status]
-  const deliveryWindow = deliverySlots?.length
-    ? [...deliverySlots].sort().map(slotLabel).join(', ')
-    : null
+  const deliveryWindow = deliveryWhen(data.deliveryDate, deliverySlots)
 
   const unpaid = paymentStatus !== 'paid'
 
@@ -575,7 +593,7 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
       ${status === 'shipped' && deliveryWindow ? infoBox(
         '#FAF6F1',
         '#F0E2D0',
-        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery Time</p>
+        `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">🕐 Delivery</p>
          <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${deliveryWindow}</p>`
       ) : ''}
 

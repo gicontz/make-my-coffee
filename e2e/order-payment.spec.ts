@@ -17,12 +17,24 @@ const CUSTOMER = {
   postalCode: '1611', address: '1611 KC-14', notes: '',
 }
 
+// POST /api/orders requires a delivery date, earliest tomorrow. Derived rather
+// than hardcoded so the suite does not start failing the day a fixed date
+// falls into the past.
+function tomorrowInManila(): string {
+  const manila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+  const [y, m, d] = manila.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d) + 86_400_000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`
+}
+
 function orderPayload(over: Record<string, unknown> = {}) {
   const { customer, ...rest } = over
   return {
     customer: { ...CUSTOMER, email: uniqueEmail('pay'), ...(customer as object ?? {}) },
     items: [{ id: '7-shot', name: 'Aconchego Classic', shots: 7, price: 449, quantity: 1 }],
     subtotal: 449,
+    deliveryDate: tomorrowInManila(),
     deliverySlots: ['09-10', '13-14'],
     ...rest,
   }

@@ -9,6 +9,7 @@ import bottleImg from '@/app/assets/bottle.png'
 import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
+import { earliestDeliveryDate, formatDeliveryDate, latestDeliveryDate, validateDeliveryDate } from '@/lib/deliveryDate'
 import { FREE_SHIPPING_VOUCHER_CAP, isValidCode, normalizeCode, shippingAfterVoucher, type AppliedVoucher } from '@/lib/vouchers'
 import {
   CHECKOUT_PAYMENT_METHODS, DEFAULT_PAYMENT_METHOD, paymentMethodLabel, qrAccountFor,
@@ -47,6 +48,16 @@ export default function OrderPage() {
   const { items, total, clearCart } = useCart()
   const [form, setForm] = useState<Form>(INITIAL_FORM)
   const [deliverySlots, setDeliverySlots] = useState<string[]>([])
+  // Required. Until now the shop captured time windows but no day, so "9-10am"
+  // said nothing about which morning.
+  const [deliveryDate, setDeliveryDate] = useState('')
+  // Bounds are pinned to Asia/Manila inside lib/deliveryDate, so they agree
+  // whatever zone the browser or the render host is in. Computed once rather
+  // than per render — a tab left open across midnight would otherwise start
+  // offering a date the server has already stopped accepting, and the server
+  // is the one that decides.
+  const [minDate] = useState(() => earliestDeliveryDate())
+  const [maxDate] = useState(() => latestDeliveryDate())
   // How the customer says they'll pay. Display-only: choosing GCash/Maya/GoTyme
   // shows that account's QR and nothing more — no gateway, no verification, and
   // Place Order stays enabled throughout (decision.md D13). The server records
@@ -238,6 +249,12 @@ export default function OrderPage() {
     e.preventDefault()
     setError('')
 
+    const dateError = validateDeliveryDate(deliveryDate)
+    if (dateError) {
+      setError(dateError)
+      return
+    }
+
     const slotError = validateDeliverySlots(deliverySlots)
     if (slotError) {
       setError(slotError)
@@ -259,6 +276,7 @@ export default function OrderPage() {
             quantity: i.quantity,
           })),
           subtotal: total,
+          deliveryDate,
           deliverySlots,
           voucherCode: voucher?.code ?? null,
           paymentMethod,
@@ -297,11 +315,14 @@ export default function OrderPage() {
           <p className="text-espresso-600 mb-2">
             A confirmation has been sent to <span className="font-semibold">{form.email}</span>.
           </p>
-          {deliverySlots.length > 0 && (
+          {deliveryDate && (
             <p className="text-espresso-500 text-sm mb-2">
-              Delivery window: <span className="font-semibold text-espresso-700">
-                {[...deliverySlots].sort().map(slotLabel).join(', ')}
-              </span>
+              Arriving <span className="font-semibold text-espresso-700">{formatDeliveryDate(deliveryDate)}</span>
+              {deliverySlots.length > 0 && (
+                <> between <span className="font-semibold text-espresso-700">
+                  {[...deliverySlots].sort().map(slotLabel).join(', ')}
+                </span></>
+              )}
             </p>
           )}
           {placedAccount ? (
@@ -475,7 +496,7 @@ export default function OrderPage() {
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <h2 className="text-espresso-900 font-bold text-xl flex items-center gap-3" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>
                     <span className="w-8 h-8 rounded-full bg-espresso-400 text-espresso-900 text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
-                    Delivery Time
+                    Delivery Date &amp; Time
                   </h2>
                   <button
                     type="button"
@@ -490,8 +511,31 @@ export default function OrderPage() {
                   </button>
                 </div>
                 <p className="text-espresso-500 text-sm mb-5">
-                  We deliver between 9:00 AM and 7:00 PM. Choose at least one morning and one afternoon–evening time — pick more if you're flexible.
+                  Pick the day you'd like it, then the times that suit you. We deliver between 9:00 AM and 7:00 PM — choose at
+                  least one morning and one afternoon–evening window, and more if you're flexible.
                 </p>
+
+                <div className="mb-6">
+                  <label htmlFor="deliveryDate" className="block text-espresso-700 text-xs font-semibold uppercase tracking-wider mb-1.5">
+                    Delivery Date *
+                  </label>
+                  <input
+                    id="deliveryDate"
+                    type="date"
+                    name="deliveryDate"
+                    value={deliveryDate}
+                    onChange={e => setDeliveryDate(e.target.value)}
+                    min={minDate}
+                    max={maxDate}
+                    required
+                    className={`${inputCls} max-w-xs`}
+                  />
+                  <p className="text-espresso-400 text-[11px] mt-1">
+                    {deliveryDate
+                      ? `Arriving ${formatDeliveryDate(deliveryDate)}`
+                      : `Earliest is ${formatDeliveryDate(minDate)} — we need a full day to bottle your order.`}
+                  </p>
+                </div>
 
                 {(['morning', 'afternoon'] as SlotPeriod[]).map(period => (
                   <div key={period} className="mb-5 last:mb-0">

@@ -11,6 +11,7 @@ import { products } from '../products.ts'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '../shipping.ts'
 import { siteUrl } from '../siteUrl.ts'
 import { slotLabel } from '../deliverySlots.ts'
+import { formatDeliveryDate } from '../deliveryDate.ts'
 import { paymentMethodLabel, qrAccountFor } from '../paymentMethods.ts'
 
 export interface QuickReply {
@@ -176,6 +177,7 @@ export interface TrackableOrder {
   payment_status: string
   payment_method: string
   total: number
+  delivery_date: string | null
   delivery_slots: string[] | null
   created_at: string | Date
 }
@@ -197,9 +199,15 @@ const STATUS_TEXT: Record<string, string> = {
  * reprinting a home address into a chat window.
  */
 export function formatOrderStatus(order: TrackableOrder): string {
-  const window = order.delivery_slots?.length
+  const windows = order.delivery_slots?.length
     ? [...order.delivery_slots].sort().map(slotLabel).join(', ')
     : null
+  // The day leads when we have it. A bare "9:00 – 10:00 AM" is precisely the
+  // ambiguity the delivery date was added to remove, and "when is my order
+  // coming" is the question being answered here.
+  const when = order.delivery_date
+    ? `${formatDeliveryDate(order.delivery_date)}${windows ? ` · ${windows}` : ''}`
+    : windows
 
   const paid = order.payment_status === 'paid'
   const method = paymentMethodLabel(order.payment_method)
@@ -208,7 +216,7 @@ export function formatOrderStatus(order: TrackableOrder): string {
     `Order #${order.id} — ${STATUS_TEXT[order.order_status] ?? order.order_status}.`,
     `Total: ₱${Number(order.total).toLocaleString()}`,
   ]
-  if (window) lines.push(`Delivery window: ${window}`)
+  if (when) lines.push(`Delivery: ${when}`)
   lines.push(
     paid
       ? `Payment: recorded as paid (${method}).`

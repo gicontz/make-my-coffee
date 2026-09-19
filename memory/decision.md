@@ -319,6 +319,35 @@ have cost orders from customers who intended to pay after.
   open item below) — the same gap COD had, but easier to hit now that a
   customer can leave without ever handing over cash.
 
+## D14 — Checkout captures a delivery date, earliest tomorrow
+**Decision:** `/order` requires a delivery date alongside the existing time
+windows, stored as `orders.delivery_date DATE`. Selectable range is tomorrow to
+30 days out, in Asia/Manila.
+**Why:** the shop captured windows but no day, so "9–10am" on an order said
+nothing about which morning — unanswerable for the operator and for the
+customer asking the bot where their order is.
+**Why tomorrow, not today:** it falls out of the existing slot rule rather than
+being a lead time someone picked. `validateDeliverySlots` requires at least one
+morning *and* one afternoon window, so an order placed after about 11am could
+never be satisfied same-day. Allowing today would offer a date the slot rule
+then rejects.
+**Implications:**
+- The column is **nullable**. Every order placed before this has no date, and
+  inventing one would put a delivery day in front of a customer that nobody
+  agreed to. NULL means "placed before we asked", not "skipped".
+- `DATE`, not `TIMESTAMPTZ`: a calendar day the customer named, not an instant.
+  `formatDeliveryDate()` formats in UTC against a UTC-constructed date so the
+  day stored is the day printed — formatting a bare date in a named zone is the
+  off-by-one this avoids.
+- Bounds are computed server-side in Manila and not trusted from the request.
+  The browser's `min`/`max` are a convenience; a tab left open overnight would
+  otherwise post yesterday quite happily.
+- Emails, the admin order card and the chat bot's order summary all lead with
+  the day and then the windows, via one shared renderer. A bare time range is
+  the ambiguity this decision exists to remove.
+- `manilaDay()` now lives in `lib/deliveryDate.ts` and the chat budget imports
+  it, rather than each keeping a copy of the same `Intl` call.
+
 ---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.

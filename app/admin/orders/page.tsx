@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { slotLabel } from '@/lib/deliverySlots'
+import { formatDeliveryDate } from '@/lib/deliveryDate'
 import { PAYMENT_METHODS, paymentMethodLabel } from '@/lib/paymentMethods'
 
 interface Order {
@@ -29,6 +30,7 @@ interface Order {
   payment_status: string
   payment_method: string
   notes: string
+  delivery_date: string | null
   delivery_slots: string[]
   created_at: string
 }
@@ -284,9 +286,14 @@ export default function AdminOrders() {
                       {order.notes && <p className="text-espresso-400 italic">"{order.notes}"</p>}
                     </div>
 
-                    {order.delivery_slots?.length > 0 && (
+                    {(order.delivery_date || order.delivery_slots?.length > 0) && (
                       <div className="mt-3 pt-3 border-t border-espresso-100">
-                        <p className="text-xs font-semibold text-espresso-500 uppercase tracking-wider mb-2">Delivery Time</p>
+                        <p className="text-xs font-semibold text-espresso-500 uppercase tracking-wider mb-2">Delivery</p>
+                        {order.delivery_date && (
+                          <p className="text-sm font-semibold text-espresso-900 mb-1.5">
+                            {formatDeliveryDate(order.delivery_date)}
+                          </p>
+                        )}
                         <div className="flex flex-wrap gap-1.5">
                           {[...order.delivery_slots].sort().map(id => (
                             <span key={id} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-espresso-50 border border-espresso-200 text-espresso-700">
