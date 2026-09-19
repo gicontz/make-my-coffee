@@ -84,6 +84,8 @@ export interface CheckoutCustomer {
   barangay?: string
   postalCode?: string
   address?: string
+  /** Override the default of tomorrow. */
+  deliveryDate?: string
 }
 
 // Fills every required checkout field except the voucher. The map pin is
@@ -104,10 +106,23 @@ export async function fillCheckout(page: Page, customer: CheckoutCustomer) {
   await page.locator('input[name="postalCode"]').fill(customer.postalCode ?? '1611')
   await page.locator('input[name="address"]').fill(customer.address ?? '1611 KC-14')
 
+  // Required, earliest tomorrow (lib/deliveryDate.ts). Derived from the
+  // browser's Manila date rather than hardcoded, so the suite does not start
+  // failing the day a fixed value falls into the past.
+  await page.locator('input[name="deliveryDate"]').fill(customer.deliveryDate ?? tomorrowInManila())
+
   // The slot rule needs at least one morning and one afternoon–evening window
   // (lib/deliverySlots.ts), enforced on both client and server.
   await page.getByRole('button', { name: '9:00 – 10:00 AM' }).click()
   await page.getByRole('button', { name: '1:00 – 2:00 PM' }).click()
+}
+
+export function tomorrowInManila(): string {
+  const manila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+  const [y, m, d] = manila.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d) + 86_400_000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`
 }
 
 // Applies a code and waits for the check to *settle* before returning. The

@@ -138,6 +138,7 @@ export interface OrderRow {
   payment_status: string
   payment_method: string
   paid_at: string | null
+  delivery_date: string | null
   updated_at: string
 }
 

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_status TEXT NOT NULL DEFAULT 'unpaid',
   paid_at        TIMESTAMPTZ,
   order_status   TEXT NOT NULL DEFAULT 'pending',
+  delivery_date  DATE,
   delivery_slots TEXT[] NOT NULL DEFAULT '{}',
   shipping_source TEXT NOT NULL DEFAULT 'flat',
   shipping_distance_km NUMERIC,
@@ -33,8 +34,8 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Applied to the live DB via lib/migrations/0001_add_delivery_slots.sql,
 -- 0002_add_shipping_source.sql, 0003_add_barangay_and_pin.sql,
--- 0004_add_vouchers.sql and 0005_add_paid_at.sql; included here too so a
--- fresh setup doesn't need the migrations separately.
+-- 0004_add_vouchers.sql, 0005_add_paid_at.sql and 0008_add_delivery_date.sql;
+-- included here too so a fresh setup doesn't need the migrations separately.
 
 CREATE INDEX IF NOT EXISTS orders_order_status_idx  ON orders (order_status);
 CREATE INDEX IF NOT EXISTS orders_created_at_idx    ON orders (created_at DESC);

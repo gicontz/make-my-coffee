@@ -35,10 +35,7 @@ export function nextAssistantBudget(
   return { calls: allowed ? used + 1 : used, day: today, allowed }
 }
 
-/** Asia/Manila date as YYYY-MM-DD — the day boundary the shop actually lives in. */
-export function manilaDay(now = new Date()): string {
-  // Matching lib/stats.ts's discipline: never let the runtime's zone (UTC on
-  // Vercel) decide what "today" means, or a cap resets in the middle of an
-  // evening's traffic.
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(now)
-}
+// Asia/Manila day boundary, shared with the delivery-date rules rather than
+// reimplemented — never let the runtime's zone (UTC on Vercel) decide what
+// "today" means, or a cap resets mid-evening.
+export { manilaDay } from '../deliveryDate.ts'

@@ -142,6 +142,7 @@ const ORDER: TrackableOrder = {
   payment_status: 'unpaid',
   payment_method: 'gcash',
   total: 548,
+  delivery_date: '2026-09-20',
   delivery_slots: ['13-14', '09-10'],
   created_at: '2026-09-07T02:00:00.000Z',
 }
@@ -152,8 +153,16 @@ test('an order summary carries status, total, window and payment — and nothing
   assert.match(text, /out for delivery/)
   assert.match(text, /₱548/)
   // Slots are sorted, not echoed in the order they were stored.
-  const window = text.split('\n').find(l => l.startsWith('Delivery window:'))!
-  assert.ok(window.indexOf('9:00') < window.indexOf('1:00'), window)
+  const when = text.split('\n').find(l => l.startsWith('Delivery:'))!
+  assert.ok(when.indexOf('9:00') < when.indexOf('1:00'), when)
+  // The day leads, so "9:00 – 10:00 AM" can never be read as some other
+  // morning. Asserted on the parts rather than their order — how en-PH arranges
+  // them is Intl's business, and pinning it here would fail on a locale-data
+  // update without anything actually being wrong.
+  assert.match(when, /Sep/)
+  assert.match(when, /20/)
+  assert.match(when, /2026/)
+  assert.ok(when.indexOf('2026') < when.indexOf('9:00'), 'the date must come before the windows')
   assert.match(text, /GCash/)
   assert.match(text, /screenshot/)
 })

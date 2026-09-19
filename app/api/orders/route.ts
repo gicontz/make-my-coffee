@@ -3,6 +3,7 @@ import { sql } from '@/lib/db'
 import { sendOrderEmails } from '@/lib/email'
 import { getShippingFee } from '@/lib/shippingQuote'
 import { validateDeliverySlots } from '@/lib/deliverySlots'
+import { validateDeliveryDate } from '@/lib/deliveryDate'
 import { priceOrderItems } from '@/lib/products'
 import { applyVoucher, freeShippingSubsidy, shippingAfterVoucher, type AppliedVoucher } from '@/lib/vouchers'
 import { attachOrder, claimVoucher, findVoucherByCode, releaseVoucher } from '@/lib/voucherStore'
@@ -11,7 +12,7 @@ import { DEFAULT_PAYMENT_METHOD, isCheckoutPaymentMethod } from '@/lib/paymentMe
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { customer, items, deliverySlots, voucherCode, paymentMethod } = body
+    const { customer, items, deliveryDate, deliverySlots, voucherCode, paymentMethod } = body
 
     if (!customer) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
@@ -51,6 +52,14 @@ export async function POST(request: NextRequest) {
     const slotError = validateDeliverySlots(deliverySlots)
     if (slotError) {
       return NextResponse.json({ error: slotError }, { status: 400 })
+    }
+
+    // Same for the date. The bounds are computed here, in Manila, rather than
+    // trusting the min/max the browser was handed — a stale tab left open
+    // overnight would otherwise happily post yesterday.
+    const dateError = validateDeliveryDate(deliveryDate)
+    if (dateError) {
+      return NextResponse.json({ error: dateError }, { status: 400 })
     }
 
     // Authoritative shipping price — recomputed here regardless of anything
@@ -112,7 +121,7 @@ export async function POST(request: NextRequest) {
           items, subtotal, discount, shipping, total,
           voucher_id, voucher_code,
           payment_method, payment_status, order_status,
-          delivery_slots, shipping_source, shipping_distance_km,
+          delivery_date, delivery_slots, shipping_source, shipping_distance_km,
           delivery_lat, delivery_lng
         ) VALUES (
           ${customer.firstName}, ${customer.lastName}, ${customer.email}, ${customer.phone ?? ''},
@@ -120,7 +129,7 @@ export async function POST(request: NextRequest) {
           ${JSON.stringify(pricedItems)}, ${subtotal}, ${discount}, ${shipping}, ${total},
           ${voucherId}, ${applied?.code ?? ''},
           ${method}, 'unpaid', 'pending',
-          ${deliverySlots}, ${shippingQuote.source}, ${shippingQuote.distanceKm},
+          ${deliveryDate}, ${deliverySlots}, ${shippingQuote.source}, ${shippingQuote.distanceKm},
           ${customer.lat ?? null}, ${customer.lng ?? null}
         )
         RETURNING id
@@ -146,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     await sendOrderEmails({
       orderId, customer, items: pricedItems, subtotal, discount, shipping, total,
-      deliverySlots, voucher: applied, paymentMethod: method,
+      deliveryDate, deliverySlots, voucher: applied, paymentMethod: method,
     }).catch(err => console.error('Email send failed:', err))
 
     return NextResponse.json({ orderId })

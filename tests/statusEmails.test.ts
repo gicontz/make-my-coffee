@@ -27,6 +27,7 @@ const ROW = {
   province: 'Metro Manila / NCR',
   postal_code: '1611',
   total: 548,
+  delivery_date: '2026-09-20',
   delivery_slots: ['09-10', '13-14'],
   payment_method: 'gcash',
   payment_status: 'unpaid',
@@ -94,6 +95,15 @@ test('missing payment columns fall back to unpaid COD, not to blank', () => {
   )
   assert.equal(data.paymentMethod, 'cod')
   assert.equal(data.paymentStatus, 'unpaid')
+})
+
+test('the delivery date carries through, and its absence is null not a guess', () => {
+  assert.equal(statusEmailFromOrderRow(ROW, 'shipped').deliveryDate, '2026-09-20')
+  // Orders placed before the date was captured have none. Inventing one would
+  // put a delivery day in front of a customer that nobody ever agreed to.
+  for (const value of [null, undefined, '']) {
+    assert.equal(statusEmailFromOrderRow({ ...ROW, delivery_date: value }, 'shipped').deliveryDate, null)
+  }
 })
 
 test('a null delivery_slots becomes an empty list, not a crash', () => {

@@ -23,7 +23,7 @@ npm start
 | `/` | `app/page.tsx` | Landing page — server component |
 | `/shop` | `app/shop/page.tsx` | 3 product cards, add to cart |
 | `/cart` | `app/cart/page.tsx` | Cart view with qty controls |
-| `/order` | `app/order/page.tsx` | Checkout form + payment method picker (COD / QR) |
+| `/order` | `app/order/page.tsx` | Checkout form + delivery date/time + payment method picker (COD / QR) |
 
 ## Key files
 - `lib/products.ts` — single source of truth for product data and the `Product` type
@@ -208,6 +208,27 @@ Both pages are statically prerendered, so a change needs a redeploy.
 collection list mirrors the `orders` and `chat_*` tables, and the processor list
 is every external host the app talks to. Add a processor or a column and that
 page is wrong until it is updated.
+
+## Delivery date & time
+Checkout captures a **required delivery date** (`lib/deliveryDate.ts`) alongside
+the time windows (`lib/deliverySlots.ts`). Stored on `orders.delivery_date`
+(migration 0008, nullable — orders placed before this have none, and a NULL
+means "placed before we asked", not "customer skipped it").
+
+**Earliest is tomorrow, and that is not an arbitrary lead time:** the slot rule
+requires at least one morning *and* one afternoon window, so an order placed
+after ~11am could never be served same-day. Latest is `MAX_DAYS_AHEAD` (30).
+
+Every bound is Asia/Manila explicitly — the runtime is UTC on Vercel, eight
+hours behind, so trusting it would offer a date the server then rejects for most
+of a Philippine evening. The browser's `min`/`max` are a convenience; the server
+recomputes and is the source of truth, because a tab left open overnight would
+otherwise post yesterday.
+
+`DATE`, not `TIMESTAMPTZ` — a calendar day the customer named, not an instant.
+Render it with `formatDeliveryDate()`, which formats in UTC against a
+UTC-constructed date so the day stored is the day printed; formatting a bare
+date in a named zone is the classic off-by-one.
 
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side

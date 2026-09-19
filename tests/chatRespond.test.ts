@@ -20,6 +20,7 @@ const ORDER: TrackableOrder = {
   payment_status: 'unpaid',
   payment_method: 'gcash',
   total: 548,
+  delivery_date: '2026-09-20',
   delivery_slots: ['09-10', '13-14'],
   created_at: '2026-09-07T02:00:00.000Z',
 }
