@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { pageMeta } from '@/lib/seo'
 import { CONTACT_EMAIL, LEGAL_NAME, PRIVACY_UPDATED } from '@/lib/business'
+import { activeTrackerNames, hasAdvertisingTrackers, hasTrackers } from '@/lib/analytics'
 
 export const metadata = pageMeta({
   title: 'Privacy Policy',
@@ -39,9 +40,10 @@ export default function PrivacyPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
         <Section title="The short version">
           <p>
-            We collect what we need to deliver coffee to you and nothing else. We do not run advertising trackers,
-            we do not use analytics, and we have never sold anyone&apos;s details. If you want your information
-            removed, email us and we will remove it.
+            We collect what we need to deliver coffee to you. We also use analytics and advertising measurement
+            tools, but <strong className="text-espresso-800">only if you agree to them</strong> — nothing loads
+            until you accept, and ordering works exactly the same if you decline. We have never sold anyone&apos;s
+            details. If you want your information removed, email us and we will remove it.
           </p>
         </Section>
 
@@ -60,8 +62,36 @@ export default function PrivacyPage() {
 
           <p><strong className="text-espresso-800">What we do not collect:</strong> we do not store card or wallet
           credentials — QR payments happen entirely inside your own banking app, and we only ever see the receipt
-          you choose to send us. We do not use advertising or analytics trackers of any kind.</p>
+          you choose to send us.</p>
         </Section>
+
+        {hasTrackers() && (
+          <Section title={hasAdvertisingTrackers() ? 'Analytics and advertising' : 'Analytics'}>
+            <p>
+              With your agreement we use {activeTrackerNames().join(', ')} to understand which pages people
+              actually use
+              {hasAdvertisingTrackers() ? ' and to measure whether our ads reach anyone' : ''}. These tools set
+              their own cookies and can see the pages you visit on this site, your approximate location from
+              your IP address, and your browser and device type.
+            </p>
+            <p>
+              <strong className="text-espresso-800">Nothing loads until you say yes.</strong> The banner appears
+              on your first visit; decline it, or simply ignore it, and none of these scripts are fetched, no
+              cookie of theirs is set and nothing is sent to them. The site and checkout work identically either
+              way — we do not withhold anything from people who say no.
+            </p>
+            <p>
+              Your answer is kept in your own browser under <code className="text-espresso-800">mmc-consent</code>.
+              It never reaches us and identifies nobody. To change your mind, clear this site&apos;s data in your
+              browser and the banner will ask again.
+            </p>
+            <p>
+              These companies process what they collect under their own policies, and for advertising they may
+              combine it with what they already know about you. We never send them your name, email, phone
+              number or delivery address.
+            </p>
+          </Section>
+        )}
 
         <Section title="Why we hold it">
           <p>To take, price, deliver and confirm your order; to send you order confirmations and delivery updates;
@@ -82,7 +112,10 @@ export default function PrivacyPage() {
               Receive your email address and the contents of that email.</li>
             <li><strong className="text-espresso-800">Anthropic</strong> — powers the chat assistant. Receives the
               text of chat messages when the assistant answers them. It is not used to train their models.</li>
-            <li><strong className="text-espresso-800">Meta</strong> — only if you choose to message our Facebook Page.
+            <li><strong className="text-espresso-800">{activeTrackerNames().join(', ')}</strong> — analytics
+              {hasAdvertisingTrackers() ? ' and advertising measurement' : ''}, <em>only</em> where you have
+              accepted the banner. Nothing is sent to them otherwise.</li>
+            <li><strong className="text-espresso-800">Meta</strong> — separately, if you choose to message our Facebook Page.
               Anything you send there is handled under Meta&apos;s own policy, not this one.</li>
           </ul>
           <p>Nobody on this list is permitted to use your details for their own marketing, and we have never sold or
@@ -90,7 +123,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="Cookies">
-          <p>Three, all functional — none for advertising:</p>
+          <p>The ones we set ourselves are all functional:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li><code className="text-espresso-800">mmc-chat</code> — keeps your chat conversation attached to your
               browser. Expires after a year.</li>
@@ -98,6 +131,8 @@ export default function PrivacyPage() {
               back office. Never set for customers.</li>
             <li>Your <strong className="text-espresso-800">cart</strong> is kept in your browser&apos;s own storage,
               not on our servers, until you place the order.</li>
+            <li><code className="text-espresso-800">mmc-consent</code> — remembers whether you accepted or declined
+              the analytics banner, so you are asked once. Stays in your browser.</li>
           </ul>
         </Section>
 

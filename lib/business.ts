@@ -41,4 +41,4 @@ export const DELIVERY_HOURS = '9:00 AM – 7:00 PM daily'
  * not an env var: the date is a claim about when the policy text changed, so it
  * belongs in the same commit as the text it describes.
  */
-export const PRIVACY_UPDATED = '8 September 2026'
+export const PRIVACY_UPDATED = '24 September 2026'
