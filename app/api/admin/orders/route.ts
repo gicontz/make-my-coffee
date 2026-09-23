@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { isAdminAuthenticated } from '@/lib/session'
 
 // This route reads request.url (the ?status= filter) and lists live orders, so
 // it can never be prerendered. Without this, `next build` tries to render it
@@ -17,6 +18,14 @@ export const dynamic = 'force-dynamic'
 // the text keeps every zone out of it.
 
 export async function GET(request: NextRequest) {
+  // Guarded here as well as in middleware.ts. The middleware matcher missed
+  // `/api/admin/*` entirely once, and this endpoint answered every customer's
+  // name, email, phone and address to anyone who asked. One layer is one edit
+  // away from doing it again.
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
