@@ -40,6 +40,26 @@ export const products: Product[] = [
   },
 ]
 
+/**
+ * What one latte from this bottle costs, in whole pesos.
+ *
+ * Derived, never written down: the marketing plan leads on price ("a homemade
+ * latte costs about half a café one"), and a figure typed into copy stops
+ * being true the moment a price changes. One shot makes one drink, so this is
+ * simply the bottle over its shots.
+ *
+ * Milk is not included — it is the customer's, and its price is not ours to
+ * claim.
+ */
+export function pricePerShot(product: Pick<Product, 'price' | 'shots'>): number {
+  return Math.round(product.price / product.shots)
+}
+
+/** Find a bottle by the id used in its URL. */
+export function productById(id: string): Product | undefined {
+  return products.find(p => p.id === id)
+}
+
 // Largest quantity accepted for a single line. Not a stock rule (there is no
 // inventory tracking) — just a sanity bound so a malformed or hostile payload
 // can't book a 10-million-bottle order.

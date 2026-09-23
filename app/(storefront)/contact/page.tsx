@@ -1,12 +1,14 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
+import { pageMeta } from '@/lib/seo'
 import { BUSINESS_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE, DELIVERY_HOURS } from '@/lib/business'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 
-export const metadata: Metadata = {
-  title: 'Contact — Make My Coffee',
-  description: 'Get in touch about an order, delivery, or anything else — Make My Coffee, Aconchego espresso shots.',
-}
+export const metadata = pageMeta({
+  title: 'Contact us',
+  description:
+    'Questions about an order, delivery or the coffee itself — chat, email or phone Make My Coffee.',
+  path: '/contact',
+})
 
 const serif = { fontFamily: 'var(--font-playfair), Georgia, serif' }
 
