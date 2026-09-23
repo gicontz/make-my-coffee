@@ -7,6 +7,7 @@ import type { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
+import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 
 export default function ShopPage() {
   const { addToCart } = useCart()
@@ -147,7 +148,7 @@ export default function ShopPage() {
             className="text-espresso-50 text-2xl font-bold mb-3"
             style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
           >
-            Free shipping on orders over ₱1,000
+            Free shipping to Pasig City on orders over ₱{FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()}
           </h3>
           <p className="text-espresso-400 max-w-lg mx-auto">
             All bottles are sealed and shipped fresh. Best consumed within 7 days of opening for peak flavor.

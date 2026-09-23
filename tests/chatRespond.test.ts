@@ -13,6 +13,7 @@ import assert from 'node:assert/strict'
 
 import { PAYLOADS, type OrderReference, type TrackableOrder } from '../lib/chat/conversation.ts'
 import { respondToPayload, respondToText, type LookupOutcome, type RespondDeps } from '../lib/chat/respond.ts'
+import { FREE_SHIPPING_MIN_SUBTOTAL } from '../lib/shipping.ts'
 
 const ORDER: TrackableOrder = {
   id: 41,
@@ -58,7 +59,8 @@ test('the delivery answer never quotes a fee', async () => {
   const { deps: d } = deps()
   const reply = await respondToPayload(PAYLOADS.delivery, d)
   const fees = reply.text.match(/₱[\d,]+/g) ?? []
-  assert.deepEqual(fees, ['₱1,000'], 'only the free-delivery threshold may appear')
+  const threshold = `₱${FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()}`
+  assert.deepEqual(fees, [threshold], 'only the free-delivery threshold may appear')
 })
 
 test('the product list links to the shop, absolutely', async () => {

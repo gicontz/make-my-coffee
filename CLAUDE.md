@@ -350,7 +350,8 @@ different kind, and move `PRIVACY_UPDATED` in `lib/business.ts` when you do.
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
-- Shipping is quoted live per order from the customer's pinned dropoff (`lib/shippingQuote.ts`); free for Pasig City orders ≥ ₱1,000, and the flat ₱99 in `lib/shipping.ts` is only the fallback when a quote can't be got
+- Shipping is quoted live per order from the customer's pinned dropoff (`lib/shippingQuote.ts`); free for Pasig City orders ≥ `FREE_SHIPPING_MIN_SUBTOTAL` (₱888), and the flat ₱99 in `lib/shipping.ts` is only the fallback when a quote can't be got
+- **Never retype the free-shipping threshold.** It is tuned to the basket totals in `lib/products.ts` — ₱897 and ₱898 are reachable three ways, then nothing until ₱1,047 — so it is not a round number and moving a bottle price can silently strand it. Import `FREE_SHIPPING_MIN_SUBTOTAL`; `tests/shipping.test.ts` fails if the cluster stops qualifying
 - Free-delivery vouchers waive at most **₱150** (`FREE_SHIPPING_VOUCHER_CAP`); the customer pays any excess, and the voucher is still labelled "Free delivery". Always price it with `shippingAfterVoucher()` — never `freeShipping ? 0 : fee` (D11a)
 - **Never state a delivery fee in customer-facing copy.** It isn't knowable ahead of the pin — see the comment on `deliveryReply()`
 - Currency is PHP (`₱`), integer pesos — no cents (D1)

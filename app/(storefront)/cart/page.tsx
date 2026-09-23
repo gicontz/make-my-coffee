@@ -4,10 +4,17 @@ import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
+import { FLAT_SHIPPING_FEE, FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 
 export default function CartPage() {
   const { items, removeFromCart, updateQuantity, total, itemCount } = useCart()
-  const shipping = total >= 1000 ? 0 : 99
+  // An estimate, and labelled as one. The cart has no address yet, so this
+  // cannot apply the Pasig rule that decides the real promo, and the live
+  // per-order quote does not exist until a pin is dropped at checkout.
+  // Hardcoded numbers here went stale the moment the threshold moved.
+  const qualifiesBySubtotal = total >= FREE_SHIPPING_MIN_SUBTOTAL
+  const shipping = qualifiesBySubtotal ? 0 : FLAT_SHIPPING_FEE
+  const toFreeShipping = FREE_SHIPPING_MIN_SUBTOTAL - total
 
   if (items.length === 0) {
     return (
@@ -168,12 +175,12 @@ export default function CartPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-espresso-500">Shipping</span>
                   <span className={shipping === 0 ? 'text-green-600 font-semibold' : 'text-espresso-900 font-medium'}>
-                    {shipping === 0 ? 'Free' : `₱${shipping}`}
+                    {shipping === 0 ? 'Free in Pasig' : `₱${shipping} est.`}
                   </span>
                 </div>
-                {total < 30 && (
+                {toFreeShipping > 0 && (
                   <div className="bg-espresso-50 rounded-lg p-2.5 text-xs text-espresso-500">
-                    Add <span className="font-semibold text-espresso-700">₱{(1000 - total).toLocaleString()}</span> more for free shipping!
+                    Add <span className="font-semibold text-espresso-700">₱{toFreeShipping.toLocaleString()}</span> more for free delivery to Pasig City.
                   </div>
                 )}
               </div>
