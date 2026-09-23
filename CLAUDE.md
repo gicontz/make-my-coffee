@@ -277,9 +277,25 @@ pages with nothing to rank, and a checkout form has no business in an index.
 storage and returns are deliberately absent: nothing records them, and a guess
 about how long a perishable keeps is not one to publish.
 
-⚠️ **Adding GA4, Meta Pixel or TikTok Pixel would make `/privacy` false.** It
-currently states, truthfully, that the site runs no analytics and no
-advertising trackers. Add one and that page must change in the same commit.
+## Analytics & consent
+GA4, Meta Pixel and TikTok Pixel, all in `lib/analytics.ts` and
+`components/Analytics.tsx`. Two gates, both required:
+
+1. **An id must be set** (`NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_META_PIXEL_ID`,
+   `NEXT_PUBLIC_TIKTOK_PIXEL_ID`). None set → no banner, no scripts, and the
+   site behaves as it did before any of this existed.
+2. **The visitor must accept.** Scripts are rendered conditionally, not
+   loaded-and-disabled — verified in a browser: before consent and after a
+   decline, *zero* requests reach Google, Meta or TikTok and *zero* cookies
+   are set. Only "Allow" produces `_ga`, `fr`, `_ttp`.
+
+The choice lives in `localStorage` under `mmc-consent`; it never reaches the
+server and identifies nobody.
+
+⚠️ **Adding a tracker anywhere but `lib/analytics.ts` makes `/privacy` wrong.**
+That page renders its list of active trackers from the same config, but the
+prose around it was written for these three — re-read it if you add a
+different kind, and move `PRIVACY_UPDATED` in `lib/business.ts` when you do.
 
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side

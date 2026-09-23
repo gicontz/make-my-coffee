@@ -1,6 +1,7 @@
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import ChatWidget from '@/components/ChatWidget'
+import Analytics from '@/components/Analytics'
 import { CartProvider } from '@/context/CartContext'
 import { BUSINESS_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE, LEGAL_NAME } from '@/lib/business'
 import { BLEND_ORIGIN } from '@/lib/seo'
@@ -54,6 +55,8 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
       <main className="pt-16">{children}</main>
       <Footer />
       <ChatWidget />
+      {/* Storefront only, and only after consent — see lib/analytics.ts. */}
+      <Analytics />
     </CartProvider>
   )
 }
