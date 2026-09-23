@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     // route: never trust client-supplied totals).
     //
     // Note this prices against the *pre-discount* subtotal, so the free-Pasig
-    // ₱1000 threshold (D3) is judged on what the customer actually put in the
+    // free-shipping threshold (D3) is judged on what the customer actually put in the
     // cart. A voucher can only ever make delivery cheaper, never dearer.
     const shippingQuote = await getShippingFee(
       {

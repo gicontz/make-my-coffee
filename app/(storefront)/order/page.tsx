@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
-import { FLAT_SHIPPING_FEE, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
+import { FLAT_SHIPPING_FEE, FREE_SHIPPING_MIN_SUBTOTAL, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
 import { earliestDeliveryDate, formatDeliveryDate, latestDeliveryDate, validateDeliveryDate } from '@/lib/deliveryDate'
@@ -471,7 +471,7 @@ export default function OrderPage() {
                   {form.city && isFreeShippingEligible(form.city, total) && (
                     <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-green-700 text-sm flex items-center gap-2">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-                      Free delivery to Pasig City on orders ₱1,000+!
+                      Free delivery to Pasig City on orders ₱{FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()}+!
                     </div>
                   )}
                   <div>
