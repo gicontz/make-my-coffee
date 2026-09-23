@@ -36,6 +36,15 @@ const mixtures = [
   },
 ]
 
+import { pageMeta } from '@/lib/seo'
+
+export const metadata = pageMeta({
+  title: 'Bottled espresso shots, delivered',
+  description:
+    'Aconchego espresso shots in a bottle — pour over ice or milk for a café latte at home, no machine. 4, 7 and 10-shot bottles delivered across Metro Manila and nearby provinces.',
+  path: '/',
+})
+
 export default function HomePage() {
   return (
     <>

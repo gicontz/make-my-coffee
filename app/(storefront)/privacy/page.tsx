@@ -1,11 +1,13 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
+import { pageMeta } from '@/lib/seo'
 import { CONTACT_EMAIL, LEGAL_NAME, PRIVACY_UPDATED } from '@/lib/business'
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy — Make My Coffee',
-  description: 'What Make My Coffee collects, why, who else sees it, and how to have it removed.',
-}
+export const metadata = pageMeta({
+  title: 'Privacy Policy',
+  description:
+    'What Make My Coffee collects, why, who else sees it, and how to have it removed.',
+  path: '/privacy',
+})
 
 const serif = { fontFamily: 'var(--font-playfair), Georgia, serif' }
 

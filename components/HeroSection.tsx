@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
-import { products } from '@/lib/products'
+import { pricePerShot, products } from '@/lib/products'
 import type { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import heroSplash from '@/app/assets/hero_splash.png'
@@ -17,6 +17,9 @@ const LABEL_ANCHORS = [
 ]
 
 export default function HeroSection() {
+  // The best per-drink price across the range — the strongest honest hook.
+  const cheapestPerDrink = Math.min(...products.map(pricePerShot))
+
   const { addToCart } = useCart()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [modalProduct, setModalProduct] = useState<Product | null>(null)
@@ -59,8 +62,16 @@ export default function HeroSection() {
                 <span className="text-espresso-400">Your Way.</span>
               </h1>
 
+              {/* The headline stays the brand line; price and convenience are
+                  what actually convert, so they lead the subhead. The figure
+                  is derived from the catalog — see pricePerShot — because a
+                  number typed into copy stops being true at the next price
+                  change. Only our own price is claimed here; what a café
+                  charges is not ours to state on our own site. */}
               <p className="text-espresso-300 text-lg sm:text-xl leading-relaxed mb-10 max-w-lg">
-                Pure 30ml espresso shots from our signature Aconchego blend. No machine needed — just your creativity.
+                A café-style latte at home from about{' '}
+                <span className="text-espresso-100 font-semibold">₱{cheapestPerDrink} a drink</span> — pour a
+                30ml Aconchego shot over ice or milk. No machine, no barista.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">

@@ -250,6 +250,37 @@ into a JS `Date` at the *machine's* local midnight, so `2026-09-23` arrives as
 JSON-serialised, the first reads back as the wrong day — a bug that only
 appears in one environment. The cast keeps every zone out of it.
 
+## SEO & marketing surface
+Driven by the marketing plan's "fix before any marketing" list.
+
+| Piece | File |
+|---|---|
+| Titles, descriptions, canonicals, OG/Twitter | `lib/seo.ts` (`pageMeta`) |
+| Product pages | `app/(storefront)/shop/[id]/` — static, one per bottle, Product JSON-LD |
+| Organization JSON-LD | `app/(storefront)/layout.tsx` |
+| Sitemap / robots | `app/sitemap.ts`, `app/robots.ts` |
+
+**`BLEND_ORIGIN` in `lib/seo.ts` is the only place the blend's origin is
+stated.** The meta description used to say "Brazilian" while the page said
+Cambodia & Indonesia — a contradiction Google showed in the snippet and, on a
+food product, a labelling risk.
+
+**Per-drink price is derived, never typed.** `pricePerShot()` in
+`lib/products.ts` is bottle ÷ shots; the hero, the shop cards and the product
+pages all read it, so a price change can't leave stale copy behind.
+
+`/cart` and `/order` are `noindex` (and absent from the sitemap): per-visitor
+pages with nothing to rank, and a checkout form has no business in an index.
+
+⚠️ **Product pages state only what the code knows** — price and shots from
+`lib/products.ts`, delivery area from `lib/phLocations.ts`. Shelf life,
+storage and returns are deliberately absent: nothing records them, and a guess
+about how long a perishable keeps is not one to publish.
+
+⚠️ **Adding GA4, Meta Pixel or TikTok Pixel would make `/privacy` false.** It
+currently states, truthfully, that the site runs no analytics and no
+advertising trackers. Add one and that page must change in the same commit.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`

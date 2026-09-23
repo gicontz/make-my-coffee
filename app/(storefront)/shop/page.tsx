@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { products } from '@/lib/products'
+import { pricePerShot, products } from '@/lib/products'
 import type { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
@@ -73,7 +73,9 @@ export default function ShopPage() {
                   className="text-espresso-900 font-bold text-2xl mb-1"
                   style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}
                 >
-                  {product.name}
+                  <Link href={`/shop/${product.id}`} className="hover:text-espresso-700 transition-colors">
+                    {product.name}
+                  </Link>
                 </h2>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-espresso-400 text-sm font-semibold">{product.shots} shots</span>
@@ -97,7 +99,7 @@ export default function ShopPage() {
                   <div>
                     <div className="text-espresso-400 text-xs font-medium mb-0.5">Per bottle</div>
                     <div className="text-espresso-900 text-3xl font-bold">₱{product.price.toLocaleString()}</div>
-                    <div className="text-espresso-400 text-xs">₱{Math.round(product.price / product.shots)} per shot</div>
+                    <div className="text-espresso-400 text-xs">about ₱{pricePerShot(product)} a drink</div>
                   </div>
 
                   <button
@@ -127,6 +129,13 @@ export default function ShopPage() {
                     )}
                   </button>
                 </div>
+
+                <Link
+                  href={`/shop/${product.id}`}
+                  className="mt-4 text-espresso-500 hover:text-espresso-800 text-sm font-semibold underline underline-offset-4 self-start transition-colors"
+                >
+                  Details, delivery &amp; payment →
+                </Link>
               </div>
             </div>
           ))}
