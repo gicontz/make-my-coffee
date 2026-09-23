@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { pageMeta } from '@/lib/seo'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 import { CONTACT_EMAIL, LEGAL_NAME, PRIVACY_UPDATED } from '@/lib/business'
 import { activeTrackerNames, hasAdvertisingTrackers, hasTrackers } from '@/lib/analytics'
 
@@ -76,14 +77,19 @@ export default function PrivacyPage() {
             </p>
             <p>
               <strong className="text-espresso-800">Nothing loads until you say yes.</strong> The banner appears
-              on your first visit; decline it, or simply ignore it, and none of these scripts are fetched, no
+              on your first visit; reject it, or simply ignore it, and none of these scripts are fetched, no
               cookie of theirs is set and nothing is sent to them. The site and checkout work identically either
               way — we do not withhold anything from people who say no.
             </p>
             <p>
+              Measurement and advertising are asked separately, so you can allow one and refuse the other — and
+              refusing everything takes a single button, on the banner itself. We do not treat silence as a yes.
+            </p>
+            <p>
               Your answer is kept in your own browser under <code className="text-espresso-800">mmc-consent</code>.
-              It never reaches us and identifies nobody. To change your mind, clear this site&apos;s data in your
-              browser and the banner will ask again.
+              It never reaches us and identifies nobody. You can change it whenever you like:{' '}
+              <CookieSettingsLink className="text-espresso-900 font-semibold underline underline-offset-4" /> is in
+              the footer of every page, and withdrawing is as easy as agreeing was.
             </p>
             <p>
               These companies process what they collect under their own policies, and for advertising they may
@@ -114,7 +120,7 @@ export default function PrivacyPage() {
               text of chat messages when the assistant answers them. It is not used to train their models.</li>
             <li><strong className="text-espresso-800">{activeTrackerNames().join(', ')}</strong> — analytics
               {hasAdvertisingTrackers() ? ' and advertising measurement' : ''}, <em>only</em> where you have
-              accepted the banner. Nothing is sent to them otherwise.</li>
+              allowed that category of cookie. Nothing is sent to them otherwise.</li>
             <li><strong className="text-espresso-800">Meta</strong> — separately, if you choose to message our Facebook Page.
               Anything you send there is handled under Meta&apos;s own policy, not this one.</li>
           </ul>
@@ -123,7 +129,14 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="Cookies">
-          <p>The ones we set ourselves are all functional:</p>
+          <p>
+            Nothing is stored when you simply arrive. The full list — every name, what it does and how long it
+            lasts — is in our{' '}
+            <Link href="/cookies" className="text-espresso-900 font-semibold underline underline-offset-4">
+              Cookie Policy
+            </Link>
+            . In short, the ones we set ourselves are all functional:
+          </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li><code className="text-espresso-800">mmc-chat</code> — keeps your chat conversation attached to your
               browser. Expires after a year.</li>
@@ -131,8 +144,8 @@ export default function PrivacyPage() {
               back office. Never set for customers.</li>
             <li>Your <strong className="text-espresso-800">cart</strong> is kept in your browser&apos;s own storage,
               not on our servers, until you place the order.</li>
-            <li><code className="text-espresso-800">mmc-consent</code> — remembers whether you accepted or declined
-              the analytics banner, so you are asked once. Stays in your browser.</li>
+            <li><code className="text-espresso-800">mmc-consent</code> — remembers which cookie categories you
+              allowed, so you are asked once. Stays in your browser.</li>
           </ul>
         </Section>
 

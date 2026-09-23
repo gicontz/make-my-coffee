@@ -15,10 +15,46 @@
 // If a tracker is ever added outside this module, /privacy becomes wrong in
 // the same commit. Keep them here.
 
-/** The visitor's answer. `null` = not asked yet, or answered in another browser. */
-export type ConsentChoice = 'granted' | 'denied'
+/**
+ * What the visitor agreed to, by category.
+ *
+ * Two categories rather than one yes/no, because they are genuinely different
+ * asks: "count my visit" and "let an advertiser follow me" are not the same
+ * favour, and someone may reasonably grant the first and refuse the second.
+ * Strictly necessary items are not represented — they are not optional and
+ * offering a toggle that does nothing is theatre.
+ */
+export interface ConsentState {
+  /** Audience measurement — GA4. */
+  analytics: boolean
+  /** Advertising measurement and targeting — Meta and TikTok pixels. */
+  marketing: boolean
+}
+
+export type ConsentCategory = keyof ConsentState
 
 export const CONSENT_KEY = 'mmc-consent'
+
+/**
+ * Fired by the footer link to reopen the settings panel.
+ *
+ * An event rather than shared state: the footer is a server component, and
+ * this is the only client island that needs to know. A consent notice you can
+ * answer exactly once, with no way back, is not really a choice.
+ */
+export const OPEN_COOKIE_SETTINGS_EVENT = 'mmc:open-cookie-settings'
+
+/**
+ * Bumped when the *meaning* of a stored answer changes — a new category, or a
+ * tracker moving between categories. An older version is re-asked rather than
+ * reinterpreted: consent given to one question is not consent to a different
+ * one.
+ */
+export const CONSENT_VERSION = 2
+
+interface StoredConsent extends ConsentState {
+  v: number
+}
 
 export interface TrackerIds {
   ga4?: string
@@ -71,28 +107,80 @@ export function activeTrackerNames(ids: TrackerIds = TRACKERS): string[] {
 }
 
 /**
- * Reads the stored choice. Returns null when nothing has been decided.
+ * Turns whatever is in storage into a decision, or null for "not decided".
+ *
+ * Exported and pure so the migration below is testable without a browser.
+ */
+export function parseConsent(raw: string | null): ConsentState | null {
+  if (!raw) return null
+
+  // v1 stored a bare 'granted' | 'denied'. Those people answered a banner that
+  // asked about analytics and advertising together, so their answer maps
+  // faithfully onto both categories — re-asking would be pestering someone who
+  // already told us.
+  if (raw === 'granted') return { analytics: true, marketing: true }
+  if (raw === 'denied') return { analytics: false, marketing: false }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredConsent>
+    // A future version is not ours to interpret; ask again.
+    if (parsed?.v !== CONSENT_VERSION) return null
+    return { analytics: parsed.analytics === true, marketing: parsed.marketing === true }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Reads the stored decision. Null when nothing has been decided.
  *
  * Every access is wrapped: a private window, cleared site data, or a browser
  * set to block storage all make this throw rather than return empty, and a
  * consent banner that crashes the page is worse than no banner.
  */
-export function readConsent(): ConsentChoice | null {
+export function readConsent(): ConsentState | null {
   if (typeof window === 'undefined') return null
   try {
-    const value = window.localStorage.getItem(CONSENT_KEY)
-    return value === 'granted' || value === 'denied' ? value : null
+    return parseConsent(window.localStorage.getItem(CONSENT_KEY))
   } catch {
     // Storage unavailable — treat as undecided, which means nothing loads.
     return null
   }
 }
 
-export function writeConsent(choice: ConsentChoice): void {
+export function writeConsent(state: ConsentState): void {
   try {
-    window.localStorage.setItem(CONSENT_KEY, choice)
+    const payload: StoredConsent = { ...state, v: CONSENT_VERSION }
+    window.localStorage.setItem(CONSENT_KEY, JSON.stringify(payload))
   } catch {
-    // The choice is lost on reload, and the banner asks again. Annoying, but
-    // it fails toward *not* tracking, which is the right direction.
+    // The choice is lost on reload and the banner asks again. Annoying, but it
+    // fails toward *not* tracking, which is the right direction.
   }
+}
+
+export const ALL_OFF: ConsentState = { analytics: false, marketing: false }
+export const ALL_ON: ConsentState = { analytics: true, marketing: true }
+
+/**
+ * Which categories this deployment actually has trackers for.
+ *
+ * A toggle for a category running nothing is a lie about what is on offer, so
+ * the panel only shows the ones that exist.
+ */
+export function categoriesInUse(ids: TrackerIds = TRACKERS): ConsentCategory[] {
+  const used: ConsentCategory[] = []
+  if (ids.ga4) used.push('analytics')
+  if (ids.metaPixel || ids.tiktokPixel) used.push('marketing')
+  return used
+}
+
+export const CATEGORY_LABEL: Record<ConsentCategory, { title: string; blurb: string }> = {
+  analytics: {
+    title: 'Analytics',
+    blurb: 'Counts visits and shows us which pages people actually use. Never used to advertise to you.',
+  },
+  marketing: {
+    title: 'Advertising',
+    blurb: 'Lets us measure whether our ads work. These companies may combine it with what they already know about you.',
+  },
 }

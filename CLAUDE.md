@@ -299,6 +299,20 @@ pages with nothing to rank, and a checkout form has no business in an index.
 storage and returns are deliberately absent: nothing records them, and a guess
 about how long a perishable keeps is not one to publish.
 
+## Cookie policy
+`/cookies` is built from `lib/cookies.ts`, and so is the code that sets them —
+`CHAT_COOKIE`, `ADMIN_COOKIE` and `CART_STORAGE_KEY` are imported by the route,
+the session helper and the cart rather than written twice. Third-party groups
+render only for trackers this deployment has ids for, same as `/privacy`.
+
+⚠️ **Add a cookie or a localStorage key and it belongs in `OWN_STORAGE`.** A
+cookie policy that has drifted from the code reads as a statement of fact and
+isn't one.
+
+Verified on the live site: a plain visit sets **zero** cookies. `mmc-chat`
+appears only on the first chat message, `mmc-cart`/`mmc-consent` are
+localStorage, and `_ga`/`_ga_*`/`fr` appear only after Allow.
+
 ## Analytics & consent
 GA4, Meta Pixel and TikTok Pixel, all in `lib/analytics.ts` and
 `components/Analytics.tsx`. Two gates, both required:
@@ -306,13 +320,27 @@ GA4, Meta Pixel and TikTok Pixel, all in `lib/analytics.ts` and
 1. **An id must be set** (`NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_META_PIXEL_ID`,
    `NEXT_PUBLIC_TIKTOK_PIXEL_ID`). None set → no banner, no scripts, and the
    site behaves as it did before any of this existed.
-2. **The visitor must accept.** Scripts are rendered conditionally, not
-   loaded-and-disabled — verified in a browser: before consent and after a
-   decline, *zero* requests reach Google, Meta or TikTok and *zero* cookies
-   are set. Only "Allow" produces `_ga`, `fr`, `_ttp`.
+2. **The visitor must accept that category.** Consent is granular —
+   `analytics` gates GA4, `marketing` gates Meta and TikTok — so allowing
+   measurement is not allowing advertising. Scripts are rendered
+   conditionally, not loaded-and-disabled: before consent and after a
+   rejection, *zero* requests reach Google, Meta or TikTok and *zero* cookies
+   are set.
 
-The choice lives in `localStorage` under `mmc-consent`; it never reaches the
-server and identifies nobody.
+The banner offers **Reject all** as prominently as Accept, with **Manage** for
+the per-category panel; ignoring it counts as rejecting. `CookieSettingsLink`
+sits in the footer of every page and reopens the panel — withdrawing has to be
+as easy as agreeing, and "clear your browser data" is not a withdrawal
+mechanism anyone uses.
+
+The choice lives in `localStorage` under `mmc-consent` as
+`{analytics, marketing, v}`; it never reaches the server and identifies nobody.
+**`CONSENT_VERSION` is bumped whenever the meaning of a stored answer changes**
+— a new category, or a tracker moving between categories. An older version is
+re-asked rather than reinterpreted, the one exception being v1's bare
+`granted`/`denied`, which asked about both categories together and so maps onto
+both. `parseConsent()` is pure and covered by `tests/consent.test.ts`; anything
+it cannot vouch for reads as undecided, which loads nothing.
 
 ⚠️ **Adding a tracker anywhere but `lib/analytics.ts` makes `/privacy` wrong.**
 That page renders its list of active trackers from the same config, but the
