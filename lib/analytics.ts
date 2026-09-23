@@ -44,6 +44,18 @@ export function hasTrackers(ids: TrackerIds = TRACKERS): boolean {
 }
 
 /**
+ * True when an *advertising* tracker is configured, as opposed to analytics
+ * alone.
+ *
+ * Copy depends on this: with only GA4 running, telling someone we want to
+ * "measure our ads" claims a use that isn't happening, and a consent notice
+ * that overstates what it does is no better than one that understates it.
+ */
+export function hasAdvertisingTrackers(ids: TrackerIds = TRACKERS): boolean {
+  return Boolean(ids.metaPixel || ids.tiktokPixel)
+}
+
+/**
  * Human names for whatever is actually configured.
  *
  * The privacy page renders this rather than a hardcoded list, so the page

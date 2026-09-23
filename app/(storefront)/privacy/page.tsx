@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { pageMeta } from '@/lib/seo'
 import { CONTACT_EMAIL, LEGAL_NAME, PRIVACY_UPDATED } from '@/lib/business'
-import { activeTrackerNames, hasTrackers } from '@/lib/analytics'
+import { activeTrackerNames, hasAdvertisingTrackers, hasTrackers } from '@/lib/analytics'
 
 export const metadata = pageMeta({
   title: 'Privacy Policy',
@@ -66,12 +66,13 @@ export default function PrivacyPage() {
         </Section>
 
         {hasTrackers() && (
-          <Section title="Analytics and advertising">
+          <Section title={hasAdvertisingTrackers() ? 'Analytics and advertising' : 'Analytics'}>
             <p>
               With your agreement we use {activeTrackerNames().join(', ')} to understand which pages people
-              actually use and to measure whether our ads reach anyone. These tools set their own cookies and
-              can see the pages you visit on this site, your approximate location from your IP address, and
-              your browser and device type.
+              actually use
+              {hasAdvertisingTrackers() ? ' and to measure whether our ads reach anyone' : ''}. These tools set
+              their own cookies and can see the pages you visit on this site, your approximate location from
+              your IP address, and your browser and device type.
             </p>
             <p>
               <strong className="text-espresso-800">Nothing loads until you say yes.</strong> The banner appears
@@ -111,8 +112,9 @@ export default function PrivacyPage() {
               Receive your email address and the contents of that email.</li>
             <li><strong className="text-espresso-800">Anthropic</strong> — powers the chat assistant. Receives the
               text of chat messages when the assistant answers them. It is not used to train their models.</li>
-            <li><strong className="text-espresso-800">Google, Meta and TikTok</strong> — analytics and advertising
-              measurement, <em>only</em> where you have accepted the banner. Nothing is sent to them otherwise.</li>
+            <li><strong className="text-espresso-800">{activeTrackerNames().join(', ')}</strong> — analytics
+              {hasAdvertisingTrackers() ? ' and advertising measurement' : ''}, <em>only</em> where you have
+              accepted the banner. Nothing is sent to them otherwise.</li>
             <li><strong className="text-espresso-800">Meta</strong> — separately, if you choose to message our Facebook Page.
               Anything you send there is handled under Meta&apos;s own policy, not this one.</li>
           </ul>

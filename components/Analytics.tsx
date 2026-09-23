@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   TRACKERS,
   activeTrackerNames,
+  hasAdvertisingTrackers,
   hasTrackers,
   readConsent,
   writeConsent,
@@ -46,7 +47,9 @@ export default function Analytics() {
   return (
     <>
       {consent === 'granted' && <TrackerScripts />}
-      {consent === null && <ConsentBanner onChoose={choose} names={activeTrackerNames()} />}
+      {consent === null && (
+        <ConsentBanner onChoose={choose} names={activeTrackerNames()} ads={hasAdvertisingTrackers()} />
+      )}
     </>
   )
 }
@@ -94,7 +97,15 @@ a.parentNode.insertBefore(o,a)};ttq.load('${tiktokPixel}');ttq.page()}(window,do
   )
 }
 
-function ConsentBanner({ onChoose, names }: { onChoose: (c: ConsentChoice) => void; names: string[] }) {
+function ConsentBanner({
+  onChoose,
+  names,
+  ads,
+}: {
+  onChoose: (c: ConsentChoice) => void
+  names: string[]
+  ads: boolean
+}) {
   return (
     <div
       role="dialog"
@@ -106,8 +117,9 @@ function ConsentBanner({ onChoose, names }: { onChoose: (c: ConsentChoice) => vo
         <p className="text-sm leading-relaxed flex-1">
           {/* Named, not "we value your privacy" — a person can only decide if
               they are told who is actually being let in. */}
-          We&apos;d like to use {names.join(', ')} to see which pages work and to measure our ads. Nothing loads
-          unless you say yes, and ordering works either way.{' '}
+          We&apos;d like to use {names.join(', ')} to see which pages people find useful
+          {ads ? ' and to measure our ads' : ''}. Nothing loads unless you say yes, and ordering works either
+          way.{' '}
           <Link href="/privacy" className="underline underline-offset-2 hover:text-espresso-50">
             How we handle your details
           </Link>
