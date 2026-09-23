@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { isAdminAuthenticated } from '@/lib/session'
 import { isPaymentMethod } from '@/lib/paymentMethods'
 import { notifiesCustomer, sendOrderStatusEmail, statusEmailFromOrderRow } from '@/lib/email'
 
@@ -7,6 +8,11 @@ const VALID_ORDER_STATUSES = ['pending', 'approved', 'shipped', 'delivered', 'ca
 const VALID_PAYMENT_STATUSES = ['unpaid', 'paid']
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  // Unauthenticated, this let a stranger mark any order paid or cancel it.
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const id = Number(params.id)
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 

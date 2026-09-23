@@ -209,6 +209,28 @@ collection list mirrors the `orders` and `chat_*` tables, and the processor list
 is every external host the app talks to. Add a processor or a column and that
 page is wrong until it is updated.
 
+## Admin auth — read this before adding a route
+**Every `/api/admin/*` route asserts the session itself** with
+`isAdminAuthenticated()`, *and* `middleware.ts` matches `/api/admin/:path*`.
+Two layers on purpose.
+
+⚠️ This was not always true. The matcher used to be `/admin/:path*` — **pages
+only**. The admin pages redirected to a login while the APIs behind them
+answered anyone: `GET /api/admin/orders` returned every customer's name,
+email, phone, address and pinned coordinates to an anonymous request on the
+public site, and `PATCH /api/admin/orders/[id]` let a stranger mark orders
+paid. Fixed 2026-09-24; `tests/adminAuth.test.ts` fails if any admin route
+loses its guard or the matcher is narrowed.
+
+`login` and `logout` are deliberately unguarded — nobody could sign in
+otherwise.
+
+**Public routes may read `orders`, but only through `lookupOrder()`**
+(`lib/chat/store.ts`), which requires the order number *and* the email on that
+order, is rate-limited, and selects only `id, order_status, payment_status,
+payment_method, total, delivery_date, delivery_slots, created_at` — never a
+name, email, phone, address or coordinate. Keep it that way.
+
 ## Admin backoffice
 `app/admin/*` renders inside `components/admin/AdminShell.tsx` — a permanent
 sidebar from `lg` up, an off-canvas drawer below it, and a mobile top bar with
