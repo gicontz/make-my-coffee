@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CONTACT_EMAIL, PRIVACY_UPDATED } from '@/lib/business'
-import { TRACKERS, activeTrackerNames, hasTrackers } from '@/lib/analytics'
+import { CATEGORY_LABEL, TRACKERS, activeTrackerNames, categoriesInUse, hasTrackers } from '@/lib/analytics'
+import CookieSettingsLink from '@/components/CookieSettingsLink'
 import { OWN_STORAGE, THIRD_PARTY_STORAGE } from '@/lib/cookies'
 import { pageMeta } from '@/lib/seo'
 
@@ -33,6 +34,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  */
 export default function CookiesPage() {
   const active = THIRD_PARTY_STORAGE.filter(g => TRACKERS[g.tracker])
+  const categories = categoriesInUse()
 
   return (
     <div className="min-h-screen bg-espresso-50">
@@ -49,13 +51,14 @@ export default function CookiesPage() {
             <strong className="text-espresso-800">We set nothing when you simply arrive.</strong> Open the site,
             read it, leave again, and not a single cookie is stored. Things only get saved once you do something
             that needs remembering — adding to your cart, starting a chat
-            {hasTrackers() ? ', or accepting the analytics banner' : ''}.
+            {hasTrackers() ? ', or answering the cookie banner' : ''}.
           </p>
           {hasTrackers() && (
             <p>
               {activeTrackerNames().join(' and ')} set cookies of their own, and they only run{' '}
-              <strong className="text-espresso-800">after you accept</strong>. Decline, or ignore the banner, and
-              none of them are loaded. Everything on the site works the same either way.
+              <strong className="text-espresso-800">after you allow the category they belong to</strong>. Reject
+              them, or ignore the banner, and none of them are loaded. Everything on the site works the same
+              either way.
             </p>
           )}
         </Section>
@@ -100,9 +103,16 @@ export default function CookiesPage() {
         {active.length > 0 && (
           <Section title="Set by others, only if you accept">
             <p>
-              These are set by the companies named, not by us, once you accept the banner. We never send them your
-              name, email, phone number or delivery address.
+              These are set by the companies named, not by us, and only once you have allowed the category they
+              sit in. We never send them your name, email, phone number or delivery address.
             </p>
+            <ul className="list-disc pl-5 space-y-1">
+              {categories.map(c => (
+                <li key={c}>
+                  <strong className="text-espresso-800">{CATEGORY_LABEL[c].title}</strong> — {CATEGORY_LABEL[c].blurb}
+                </li>
+              ))}
+            </ul>
             {active.map(group => (
               <div key={group.tracker} className="pt-2">
                 <p className="text-espresso-800 font-semibold">{group.provider}</p>
@@ -127,16 +137,27 @@ export default function CookiesPage() {
 
         <Section title="Saying no, or changing your mind">
           {hasTrackers() && (
-            <p>
-              The banner appears on your first visit. Choosing <strong className="text-espresso-800">No thanks</strong>{' '}
-              means none of the analytics or advertising cookies above are ever set — nothing is loaded, so there is
-              nothing to opt out of afterwards.
-            </p>
+            <>
+              <p>
+                The banner appears on your first visit and offers{' '}
+                <strong className="text-espresso-800">Reject all</strong> as plainly as it offers Accept — one button,
+                same place, no extra screen to go through. Rejecting means none of the cookies in the previous table
+                are ever set: nothing is loaded, so there is nothing to opt out of afterwards. Ignoring the banner
+                counts as rejecting it.
+              </p>
+              <p>
+                <strong className="text-espresso-800">Manage</strong> lets you answer each category on its own, so
+                you can allow us to count visits without agreeing to advertising.
+              </p>
+              <p>
+                Changing your answer later takes one click:{' '}
+                <CookieSettingsLink className="text-espresso-900 font-semibold underline underline-offset-4" /> sits
+                in the footer of every page and reopens the same panel. Turning something off stops it from loading
+                on your next page view; cookies already set are deleted by clearing this site&apos;s data in your
+                browser.
+              </p>
+            </>
           )}
-          <p>
-            To change an answer you already gave, clear this site&apos;s data in your browser. That removes your
-            stored choice along with everything else, and the banner will ask again next time.
-          </p>
           <p>
             You can also block or delete cookies in your browser settings. The functional ones in the first table are
             the only ones the site needs; blocking them means your cart and chat will not be remembered, but you can

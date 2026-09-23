@@ -55,9 +55,9 @@ export const OWN_STORAGE: StoredItem[] = [
     name: 'mmc-consent',
     kind: 'localStorage',
     purpose:
-      'Remembers whether you accepted or declined analytics, so you are only asked once. It never reaches our servers and identifies nobody.',
+      'Remembers which categories of cookies you allowed, so you are only asked once. It never reaches our servers and identifies nobody.',
     life: 'Until you clear your browser data',
-    setWhen: 'When you answer the banner',
+    setWhen: 'When you answer the cookie banner',
     essential: true,
   },
   {

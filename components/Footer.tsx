@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import CookieSettingsLink from './CookieSettingsLink'
 import Image from 'next/image'
 import wordmark from '@/app/assets/logo-wordmark.png'
 
@@ -25,6 +26,9 @@ export default function Footer() {
                   <Link href={href} className="text-espresso-400 hover:text-espresso-300 text-sm transition-colors">{label}</Link>
                 </li>
               ))}
+              <li>
+                <CookieSettingsLink className="text-espresso-400 hover:text-espresso-300 text-sm transition-colors" />
+              </li>
             </ul>
           </div>
           <div>
