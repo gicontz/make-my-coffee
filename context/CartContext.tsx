@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { Product } from '@/lib/products'
+import { CART_STORAGE_KEY } from '@/lib/cookies'
 
 export type { Product }
 
@@ -28,14 +29,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('mmc-cart')
+      const saved = localStorage.getItem(CART_STORAGE_KEY)
       if (saved) setItems(JSON.parse(saved))
     } catch {}
     setHydrated(true)
   }, [])
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem('mmc-cart', JSON.stringify(items))
+    if (hydrated) localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
   }, [items, hydrated])
 
   const addToCart = (product: Product) => {

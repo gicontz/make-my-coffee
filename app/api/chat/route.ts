@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { sendAdminNotice } from '@/lib/email'
 import { greeting, quickReplyTitle } from '@/lib/chat/conversation'
 import { respondToPayload, respondToText, type RespondDeps } from '@/lib/chat/respond'
+import { CHAT_COOKIE as COOKIE } from '@/lib/cookies'
 import {
   appendMessage,
   claimAssistantCall,
@@ -17,7 +18,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-const COOKIE = 'mmc-chat'
+// Named in lib/cookies.ts, which /cookies documents from the same constant.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 // Long enough for a real question, short enough that nobody pastes a novel

@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 
-export const COOKIE_NAME = 'mmc_admin'
+// Defined in lib/cookies.ts so /cookies documents the same name the code sets.
+export { ADMIN_COOKIE as COOKIE_NAME } from './cookies.ts'
+import { ADMIN_COOKIE as COOKIE_NAME } from './cookies.ts'
 
 export async function createToken(username: string): Promise<string> {
   const secret = process.env.SESSION_SECRET || 'make-my-coffee-dev-secret'

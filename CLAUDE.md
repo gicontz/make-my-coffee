@@ -299,6 +299,20 @@ pages with nothing to rank, and a checkout form has no business in an index.
 storage and returns are deliberately absent: nothing records them, and a guess
 about how long a perishable keeps is not one to publish.
 
+## Cookie policy
+`/cookies` is built from `lib/cookies.ts`, and so is the code that sets them —
+`CHAT_COOKIE`, `ADMIN_COOKIE` and `CART_STORAGE_KEY` are imported by the route,
+the session helper and the cart rather than written twice. Third-party groups
+render only for trackers this deployment has ids for, same as `/privacy`.
+
+⚠️ **Add a cookie or a localStorage key and it belongs in `OWN_STORAGE`.** A
+cookie policy that has drifted from the code reads as a statement of fact and
+isn't one.
+
+Verified on the live site: a plain visit sets **zero** cookies. `mmc-chat`
+appears only on the first chat message, `mmc-cart`/`mmc-consent` are
+localStorage, and `_ga`/`_ga_*`/`fr` appear only after Allow.
+
 ## Analytics & consent
 GA4, Meta Pixel and TikTok Pixel, all in `lib/analytics.ts` and
 `components/Analytics.tsx`. Two gates, both required:

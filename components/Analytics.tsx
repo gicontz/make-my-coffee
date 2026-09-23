@@ -120,8 +120,8 @@ function ConsentBanner({
           We&apos;d like to use {names.join(', ')} to see which pages people find useful
           {ads ? ' and to measure our ads' : ''}. Nothing loads unless you say yes, and ordering works either
           way.{' '}
-          <Link href="/privacy" className="underline underline-offset-2 hover:text-espresso-50">
-            How we handle your details
+          <Link href="/cookies" className="underline underline-offset-2 hover:text-espresso-50">
+            Which cookies, and for how long
           </Link>
           .
         </p>

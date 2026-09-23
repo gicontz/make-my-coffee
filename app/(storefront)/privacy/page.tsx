@@ -123,7 +123,14 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="Cookies">
-          <p>The ones we set ourselves are all functional:</p>
+          <p>
+            Nothing is stored when you simply arrive. The full list — every name, what it does and how long it
+            lasts — is in our{' '}
+            <Link href="/cookies" className="text-espresso-900 font-semibold underline underline-offset-4">
+              Cookie Policy
+            </Link>
+            . In short, the ones we set ourselves are all functional:
+          </p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li><code className="text-espresso-800">mmc-chat</code> — keeps your chat conversation attached to your
               browser. Expires after a year.</li>
