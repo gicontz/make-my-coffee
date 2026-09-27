@@ -8,7 +8,7 @@ import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
 import bottleImg from '@/app/assets/bottle.png'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
-import { AFTER_OPENING, MADE_TO_ORDER } from '@/lib/freshness'
+import { MADE_TO_ORDER, REFRIGERATE, SHELF_LIFE } from '@/lib/freshness'
 
 export default function ShopPage() {
   const { addToCart } = useCart()
@@ -152,7 +152,7 @@ export default function ShopPage() {
             Free shipping to Pasig City on orders over ₱{FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()}
           </h3>
           <p className="text-espresso-400 max-w-lg mx-auto">
-            {MADE_TO_ORDER} {AFTER_OPENING}
+            {MADE_TO_ORDER} {REFRIGERATE} {SHELF_LIFE}
           </p>
           <div className="mt-6">
             <Link href="/cart" className="inline-flex items-center gap-2 text-espresso-400 hover:text-espresso-300 text-sm font-medium transition-colors">

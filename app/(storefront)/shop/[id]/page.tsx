@@ -6,7 +6,7 @@ import { pricePerShot, productById, products } from '@/lib/products'
 import { PROVINCES } from '@/lib/phLocations'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 import { BLEND_ORIGIN, pageMeta } from '@/lib/seo'
-import { AFTER_OPENING, MADE_TO_ORDER, TRANSIT_STORAGE } from '@/lib/freshness'
+import { FRESHNESS_SUMMARY, RETURNS } from '@/lib/freshness'
 import { siteUrl } from '@/lib/siteUrl'
 import AddToCart from './AddToCart'
 
@@ -40,10 +40,10 @@ export function generateMetadata({ params }: { params: { id: string } }) {
  * Every claim here is read from code — price and shots from lib/products.ts,
  * the delivery area from lib/phLocations.ts, freshness from lib/freshness.ts.
  *
- * Unopened shelf life, where to keep it after opening, and returns are still
- * absent — those are not recorded anywhere, and a guess about how long a
- * perishable keeps is not a guess worth publishing. See WHAT_WE_DO_NOT_KNOW
- * in lib/freshness.ts before adding any of them.
+ * Freshness and returns render whole from lib/freshness.ts rather than being
+ * paraphrased here: the no-cold-chain line holds only in transit and the
+ * 7-day window only refrigerated, so quoting half of either would publish a
+ * claim the business cannot stand behind.
  */
 export default function ProductPage({ params }: { params: { id: string } }) {
   const product = productById(params.id)
@@ -137,16 +137,21 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-espresso-800 font-semibold">How fresh it is</dt>
-                <dd className="text-espresso-600">
-                  {MADE_TO_ORDER} {TRANSIT_STORAGE} {AFTER_OPENING}
-                </dd>
+                <dt className="text-espresso-800 font-semibold">How fresh it is, and keeping it</dt>
+                {/* Rendered whole. The no-cold-chain line is only true in
+                    transit and the 7 days only true refrigerated — split
+                    them and a correct pair becomes a wrong claim. */}
+                <dd className="text-espresso-600">{FRESHNESS_SUMMARY}</dd>
               </div>
               <div>
                 <dt className="text-espresso-800 font-semibold">How to pay</dt>
                 <dd className="text-espresso-600">
                   Cash on delivery, or scan a GCash, Maya or GoTyme QR at checkout.
                 </dd>
+              </div>
+              <div>
+                <dt className="text-espresso-800 font-semibold">If something is wrong</dt>
+                <dd className="text-espresso-600">{RETURNS}</dd>
               </div>
             </dl>
           </div>

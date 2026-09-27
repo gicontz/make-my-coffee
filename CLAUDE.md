@@ -298,23 +298,33 @@ pages with nothing to rank, and a checkout form has no business in an index.
 `lib/products.ts`, delivery area from `lib/phLocations.ts`, freshness from
 `lib/freshness.ts`.
 
-## Freshness — a food claim, so read `lib/freshness.ts` first
-Three facts are known and stated in one place: bottles are **made to order**
-(brewed on the delivery date the customer picked), nothing needs refrigerating
-**in transit** (because brewing and delivery are the same day), and the flavour
-holds **7 days after opening** — a best-before, not a use-by.
+## Freshness & returns — a food claim, so read `lib/freshness.ts` first
+Everything is recorded now and stated from one module:
 
-⚠️ **Two sentences are deliberately missing**, and inventing either puts an
-unfounded safety claim on a live storefront:
-1. **How long a sealed, unopened bottle keeps.** Unrecorded. Made-to-order
-   makes it less pressing but does not answer it.
-2. **Whether to refrigerate after opening.** Same-day *transit* was ruled out
-   as needing a cold chain; the customer's kitchen was never covered.
+- **Made to order** — brewed on the delivery date the customer picked, arriving
+  that same day. There is no stock; the `InStock` Product schema leans on this.
+- **No cold chain in transit**, *because* brewing and delivery are the same day
+  — not because it is shelf-stable.
+- **Fridge from arrival**, sealed or opened.
+- **7 days from delivery, refrigerated**, one window for sealed and opened
+  alike — a best-before for flavour, never a use-by.
+- **Replace or refund** on a photo for anything wrong, damaged or spoiled; no
+  taking back opened bottles.
 
-Returns are likewise absent. The chat bot's prompt forbids it from filling
-either gap, and `tests/freshness.test.ts` fails if any surface retypes the
-window, drops the flavour-not-safety framing, or starts claiming an unopened
-shelf life.
+⚠️ **These sentences are load-bearing on each other.** "Needs no refrigeration"
+is true only of the *journey*; "7 days" is true only *refrigerated*. Either
+published alone is a wrong claim, so surfaces render them together — prefer
+`FRESHNESS_SUMMARY` over cherry-picking constants, and never paraphrase.
+
+⚠️ **One window, by decision.** Sealed and opened get the same 7 days. Two
+numbers invite a customer to misremember which applies, and the honest answer
+was the same either way.
+
+The bot may state all of it but may **not** promise a specific refund or
+replacement — that is a person's call. `tests/freshness.test.ts` fails if any
+surface splits the pair, retypes the window in rendered copy, reframes it as a
+use-by, gives a second day count, or leads the returns copy with the exclusion
+instead of the remedy.
 
 ## Cookie policy
 `/cookies` is built from `lib/cookies.ts`, and so is the code that sets them —
