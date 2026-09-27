@@ -6,6 +6,7 @@ import { pricePerShot, productById, products } from '@/lib/products'
 import { PROVINCES } from '@/lib/phLocations'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 import { BLEND_ORIGIN, pageMeta } from '@/lib/seo'
+import { AFTER_OPENING, MADE_TO_ORDER, TRANSIT_STORAGE } from '@/lib/freshness'
 import { siteUrl } from '@/lib/siteUrl'
 import AddToCart from './AddToCart'
 
@@ -37,9 +38,12 @@ export function generateMetadata({ params }: { params: { id: string } }) {
  * bottle now has its own page carrying Product structured data.
  *
  * Every claim here is read from code — price and shots from lib/products.ts,
- * the delivery area from lib/phLocations.ts. Nothing about shelf life,
- * storage or returns appears, because none of it is recorded anywhere and a
- * guess about how long a perishable keeps is not a guess worth making.
+ * the delivery area from lib/phLocations.ts, freshness from lib/freshness.ts.
+ *
+ * Unopened shelf life, where to keep it after opening, and returns are still
+ * absent — those are not recorded anywhere, and a guess about how long a
+ * perishable keeps is not a guess worth publishing. See WHAT_WE_DO_NOT_KNOW
+ * in lib/freshness.ts before adding any of them.
  */
 export default function ProductPage({ params }: { params: { id: string } }) {
   const product = productById(params.id)
@@ -130,6 +134,12 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <dd className="text-espresso-600">
                   Worked out from the exact spot you pin at checkout and shown before you pay. Free to Pasig City
                   on orders of ₱{FREE_SHIPPING_MIN_SUBTOTAL.toLocaleString()} or more.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-espresso-800 font-semibold">How fresh it is</dt>
+                <dd className="text-espresso-600">
+                  {MADE_TO_ORDER} {TRANSIT_STORAGE} {AFTER_OPENING}
                 </dd>
               </div>
               <div>

@@ -295,9 +295,26 @@ pages all read it, so a price change can't leave stale copy behind.
 pages with nothing to rank, and a checkout form has no business in an index.
 
 ⚠️ **Product pages state only what the code knows** — price and shots from
-`lib/products.ts`, delivery area from `lib/phLocations.ts`. Shelf life,
-storage and returns are deliberately absent: nothing records them, and a guess
-about how long a perishable keeps is not one to publish.
+`lib/products.ts`, delivery area from `lib/phLocations.ts`, freshness from
+`lib/freshness.ts`.
+
+## Freshness — a food claim, so read `lib/freshness.ts` first
+Three facts are known and stated in one place: bottles are **made to order**
+(brewed on the delivery date the customer picked), nothing needs refrigerating
+**in transit** (because brewing and delivery are the same day), and the flavour
+holds **7 days after opening** — a best-before, not a use-by.
+
+⚠️ **Two sentences are deliberately missing**, and inventing either puts an
+unfounded safety claim on a live storefront:
+1. **How long a sealed, unopened bottle keeps.** Unrecorded. Made-to-order
+   makes it less pressing but does not answer it.
+2. **Whether to refrigerate after opening.** Same-day *transit* was ruled out
+   as needing a cold chain; the customer's kitchen was never covered.
+
+Returns are likewise absent. The chat bot's prompt forbids it from filling
+either gap, and `tests/freshness.test.ts` fails if any surface retypes the
+window, drops the flavour-not-safety framing, or starts claiming an unopened
+shelf life.
 
 ## Cookie policy
 `/cookies` is built from `lib/cookies.ts`, and so is the code that sets them —
