@@ -16,6 +16,7 @@ import {
   type CheckoutPaymentMethod,
 } from '@/lib/paymentMethods'
 import type { LatLng, SuggestionPrecision } from '@/components/DeliveryMapPicker'
+import { trackConversion, type PlacedOrder } from '@/lib/analytics'
 
 // Leaflet needs `window` — load client-only, no SSR.
 const DeliveryMapPicker = dynamic(() => import('@/components/DeliveryMapPicker'), {
@@ -96,13 +97,27 @@ export default function OrderPage() {
   const orderTotal = total - discount + shipping
 
   // The success screen renders after clearCart(), so `total` is already 0 by
-  // then — snapshot what the customer owes at submit time instead of
-  // recomputing it from an emptied cart.
+  // then — snapshot what the customer owes instead of recomputing it from an
+  // emptied cart. Taken from the server's response, not `orderTotal`: that is
+  // a preview, and the amount to have ready for the rider is what was charged.
   const [placedTotal, setPlacedTotal] = useState(0)
 
   // guard: don't run on server
   const [hydrated, setHydrated] = useState(false)
   useEffect(() => setHydrated(true), [])
+
+  // begin_checkout, once per visit to this page. Keyed on the cart arriving,
+  // not on mount: the cart is read from localStorage in the provider's effect,
+  // which runs after this page's, so on mount it is still empty.
+  const checkoutTracked = useRef(false)
+  useEffect(() => {
+    if (checkoutTracked.current || items.length === 0) return
+    checkoutTracked.current = true
+    trackConversion({
+      kind: 'begin_checkout',
+      lines: items.map(i => ({ id: i.product.id, quantity: i.quantity })),
+    })
+  }, [items])
 
   // Pre-fills the map pin from the structured address as the customer types
   // — a starting guess only; DeliveryMapPicker stops applying these once the
@@ -284,9 +299,13 @@ export default function OrderPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to place order')
-      setPlacedTotal(orderTotal)
+      const placed = data as PlacedOrder
+      // Only now — the order exists. A click-time event would count every
+      // rejected voucher and failed submit as a sale.
+      trackConversion({ kind: 'purchase', order: placed })
+      setPlacedTotal(placed.total)
       clearCart()
-      setOrderId(data.orderId)
+      setOrderId(placed.orderId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {

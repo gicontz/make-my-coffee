@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { Product } from '@/lib/products'
 import { CART_STORAGE_KEY } from '@/lib/cookies'
+import { trackConversion } from '@/lib/analytics'
 
 export type { Product }
 
@@ -49,6 +50,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       return [...prev, { product, quantity: 1 }]
     })
+    // Here rather than at each button, so no add path can be missed. Outside
+    // the updater, which React may run twice.
+    trackConversion({ kind: 'add_to_cart', lines: [{ id: product.id, quantity: 1 }] })
   }
 
   const removeFromCart = (productId: string) => {
@@ -59,6 +63,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (quantity <= 0) {
       removeFromCart(productId)
       return
+    }
+    // The cart page's "+" puts another bottle in the cart just as surely as
+    // the shop's button does; report only the increase.
+    const current = items.find(i => i.product.id === productId)?.quantity ?? 0
+    if (quantity > current) {
+      trackConversion({ kind: 'add_to_cart', lines: [{ id: productId, quantity: quantity - current }] })
     }
     setItems(prev =>
       prev.map(i => (i.product.id === productId ? { ...i, quantity } : i))
