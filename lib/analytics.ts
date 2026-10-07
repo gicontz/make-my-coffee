@@ -13,7 +13,11 @@
 //     localStorage value, never sent to us, and it identifies nobody.
 //
 // If a tracker is ever added outside this module, /privacy becomes wrong in
-// the same commit. Keep them here.
+// the same commit. Keep them here. The same goes for what they are sent: the
+// conversion events at the bottom of this file are the only data any of them
+// receive beyond the page view, and /privacy says so.
+
+import { productById } from './products.ts'
 
 /**
  * What the visitor agreed to, by category.
@@ -183,4 +187,206 @@ export const CATEGORY_LABEL: Record<ConsentCategory, { title: string; blurb: str
     title: 'Advertising',
     blurb: 'Lets us measure whether our ads work. These companies may combine it with what they already know about you.',
   },
+}
+
+// ── Conversion events ───────────────────────────────────────────────────────
+//
+// What the ad platforms optimise toward. Given only PageView they bid for
+// cheap traffic; given a purchase with a value they bid for buyers.
+//
+// Same gate as the scripts: GA4 hears these only under `analytics`, Meta and
+// TikTok only under `marketing`, and consent is re-read at the moment of
+// firing rather than trusted from when a script loaded — a script cannot be
+// unloaded, so withdrawing mid-visit has to be honoured here instead.
+//
+// Nothing personal goes out: bottle ids, quantities, pesos and the order
+// number. Never a name, email, phone or address — no "advanced matching".
+
+export const CURRENCY = 'PHP'
+
+/** A bottle and how many — all an event needs to know about a cart line. */
+export interface ConversionLine {
+  id: string
+  quantity: number
+}
+
+/** What POST /api/orders actually charged, as it returned it. */
+export interface PlacedOrder {
+  orderId: number
+  /** The amount charged: subtotal − discount + delivery after any voucher cap. */
+  total: number
+  shipping: number
+  voucherCode: string | null
+  items: ConversionLine[]
+}
+
+export type Conversion =
+  | { kind: 'add_to_cart'; lines: ConversionLine[] }
+  | { kind: 'begin_checkout'; lines: ConversionLine[] }
+  | { kind: 'purchase'; order: PlacedOrder }
+
+type Params = Record<string, unknown>
+
+/** Each platform's call, ready to spread into gtag('event', …), fbq('track', …) and ttq.track(…). */
+export interface ConversionCalls {
+  ga4: [name: string, params: Params]
+  meta: [name: string, params: Params, options?: { eventID: string }]
+  tiktok: [name: string, params: Params, options?: { event_id: string }]
+}
+
+// TikTok has no "Purchase"; CompletePayment is the event its value
+// optimisation reads. Nothing here verifies a payment either (D13) — "purchase"
+// means "order placed", the same on all three, so they report the same thing.
+const EVENT_NAMES = {
+  add_to_cart: { ga4: 'add_to_cart', meta: 'AddToCart', tiktok: 'AddToCart' },
+  begin_checkout: { ga4: 'begin_checkout', meta: 'InitiateCheckout', tiktok: 'InitiateCheckout' },
+  purchase: { ga4: 'purchase', meta: 'Purchase', tiktok: 'CompletePayment' },
+} as const
+
+interface PricedConversionLine {
+  id: string
+  name: string
+  price: number
+  quantity: number
+}
+
+/**
+ * Names and prices from lib/products.ts, never from the cart's own copy —
+ * that is whatever sat in localStorage when the bottle was added, and can
+ * predate a price change. Ids the catalog doesn't know are dropped.
+ */
+function priceLines(lines: ConversionLine[]): PricedConversionLine[] {
+  const priced: PricedConversionLine[] = []
+  for (const line of lines) {
+    const product = productById(line.id)
+    if (!product || !Number.isInteger(line.quantity) || line.quantity < 1) continue
+    priced.push({ id: product.id, name: product.name, price: product.price, quantity: line.quantity })
+  }
+  return priced
+}
+
+/**
+ * Each platform's payload for one conversion, or null when there is nothing
+ * recognisable to report.
+ *
+ * Pure, so tests can pin exactly what each platform is told.
+ *
+ * Purchase value is the order's `total` as the server computed it — not a sum
+ * of the items. A voucher discount, a free-delivery voucher capped at ₱150
+ * and a live delivery quote all sit between the two, so the items alone would
+ * misreport revenue. Cart and checkout events have no charge yet, so theirs is
+ * the catalog value of what is in the cart.
+ */
+export function buildConversion(conversion: Conversion): ConversionCalls | null {
+  const lines = priceLines(conversion.kind === 'purchase' ? conversion.order.items : conversion.lines)
+  if (lines.length === 0) return null
+
+  const value =
+    conversion.kind === 'purchase'
+      ? conversion.order.total
+      : lines.reduce((sum, l) => sum + l.price * l.quantity, 0)
+  const names = EVENT_NAMES[conversion.kind]
+
+  const ga4: Params = {
+    currency: CURRENCY,
+    value,
+    items: lines.map(l => ({ item_id: l.id, item_name: l.name, price: l.price, quantity: l.quantity })),
+  }
+  const meta: Params = {
+    currency: CURRENCY,
+    value,
+    content_type: 'product',
+    content_ids: lines.map(l => l.id),
+    contents: lines.map(l => ({ id: l.id, quantity: l.quantity })),
+    num_items: lines.reduce((sum, l) => sum + l.quantity, 0),
+  }
+  const tiktok: Params = {
+    currency: CURRENCY,
+    value,
+    content_type: 'product',
+    contents: lines.map(l => ({ content_id: l.id, content_name: l.name, price: l.price, quantity: l.quantity })),
+  }
+
+  if (conversion.kind !== 'purchase') {
+    return { ga4: [names.ga4, ga4], meta: [names.meta, meta], tiktok: [names.tiktok, tiktok] }
+  }
+
+  // The order number is what lets each platform drop a repeat of the same
+  // sale — GA4 by transaction_id, Meta and TikTok by event id.
+  const { order } = conversion
+  const eventId = `purchase-${order.orderId}`
+  ga4.transaction_id = String(order.orderId)
+  ga4.shipping = order.shipping
+  if (order.voucherCode) ga4.coupon = order.voucherCode
+
+  return {
+    ga4: [names.ga4, ga4],
+    meta: [names.meta, meta, { eventID: eventId }],
+    tiktok: [names.tiktok, tiktok, { event_id: eventId }],
+  }
+}
+
+type TrackerWindow = Window & {
+  gtag?: (...args: unknown[]) => void
+  fbq?: (...args: unknown[]) => void
+  ttq?: { track: (...args: unknown[]) => void }
+}
+
+// The scripts load `afterInteractive`, so an event raised straight after a page
+// load — begin_checkout on a refreshed /order — can arrive before the tracker
+// exists. Wait a few seconds for it rather than drop the event; past that the
+// script was blocked or failed, and there is nothing to send it to.
+const READY_POLL_MS = 250
+const READY_POLL_TRIES = 20
+
+function whenReady(category: ConsentCategory, fire: (w: TrackerWindow) => boolean, triesLeft = READY_POLL_TRIES) {
+  // Re-checked on every attempt: a "Reject all" during the wait wins.
+  if (!readConsent()?.[category]) return
+  try {
+    if (fire(window as TrackerWindow)) return
+  } catch (err) {
+    // A retry runs from a timer, outside trackConversion's try — a throw here
+    // would surface as an uncaught error on the page.
+    console.error('Conversion tracking failed:', err)
+    return
+  }
+  if (triesLeft > 0) setTimeout(() => whenReady(category, fire, triesLeft - 1), READY_POLL_MS)
+}
+
+/**
+ * Reports a conversion to whichever trackers this visitor has allowed.
+ *
+ * Never throws: a tracker misbehaving must not break adding to cart or the
+ * order confirmation, which is what calls this.
+ */
+export function trackConversion(conversion: Conversion): void {
+  if (typeof window === 'undefined' || !hasTrackers()) return
+  try {
+    const calls = buildConversion(conversion)
+    if (!calls) return
+
+    if (TRACKERS.ga4) {
+      whenReady('analytics', w => {
+        if (typeof w.gtag !== 'function') return false
+        w.gtag('event', ...calls.ga4)
+        return true
+      })
+    }
+    if (TRACKERS.metaPixel) {
+      whenReady('marketing', w => {
+        if (typeof w.fbq !== 'function') return false
+        w.fbq('track', ...calls.meta)
+        return true
+      })
+    }
+    if (TRACKERS.tiktokPixel) {
+      whenReady('marketing', w => {
+        if (typeof w.ttq?.track !== 'function') return false
+        w.ttq.track(...calls.tiktok)
+        return true
+      })
+    }
+  } catch (err) {
+    console.error('Conversion tracking failed:', err)
+  }
 }
