@@ -279,6 +279,7 @@ Driven by the marketing plan's "fix before any marketing" list.
 |---|---|
 | Titles, descriptions, canonicals, OG/Twitter | `lib/seo.ts` (`pageMeta`) |
 | Product pages | `app/(storefront)/shop/[id]/` — static, one per bottle, Product JSON-LD |
+| Recipe pages | `app/(storefront)/recipes/[slug]/` — static, one per recipe in `lib/recipes.ts`, Recipe JSON-LD |
 | Organization JSON-LD | `app/(storefront)/layout.tsx` |
 | Sitemap / robots | `app/sitemap.ts`, `app/robots.ts` |
 
@@ -290,6 +291,15 @@ food product, a labelling risk.
 **Per-drink price is derived, never typed.** `pricePerShot()` in
 `lib/products.ts` is bottle ÷ shots; the hero, the shop cards and the product
 pages all read it, so a price change can't leave stale copy behind.
+
+**Recipes live in `lib/recipes.ts`** — the homepage cards and the recipe pages
+both read it. A new recipe is one entry there plus its image in
+`app/(storefront)/recipes/images.ts` (keyed by slug, so a missing image is a
+type error); the page, sitemap entry and homepage card follow. Recipe text
+never types a price or a shot count: cost per cup is `recipeCoffeeCost()`
+(= `pricePerShot()` × shots), the espresso line is built from `shots`, and
+`tests/recipes.test.ts` fails on a `₱`, a typed shot count, or a storage
+claim in the copy.
 
 `/cart` and `/order` are `noindex` (and absent from the sitemap): per-visitor
 pages with nothing to rank, and a checkout form has no business in an index.
