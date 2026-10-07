@@ -1,40 +1,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { products } from '@/lib/products'
+import { recipes, recipeSummary } from '@/lib/recipes'
+import { RECIPE_IMAGES } from './recipes/images'
 import HeroSection from '@/components/HeroSection'
 import bottleImg from '@/app/assets/bottle.png'
-import classicLatte from '@/app/assets/flavors/classic_latte.png'
-import honeyOat from '@/app/assets/flavors/honey_oat.png'
-import caramel from '@/app/assets/flavors/caramel.png'
-import tonic from '@/app/assets/flavors/tonic.png'
 import aconchegoBeans from '@/app/assets/aconchengo.jpg'
-
-const mixtures = [
-  {
-    name: 'Classic Latte',
-    recipe: '1 shot · 150ml steamed milk',
-    note: 'Smooth, simple, perfect.',
-    image: classicLatte,
-  },
-  {
-    name: 'Honey Oat Latte',
-    recipe: '1 shot · oat milk · 1 tsp honey',
-    note: 'Naturally sweet with a nutty finish.',
-    image: honeyOat,
-  },
-  {
-    name: 'Iced Caramel Delight',
-    recipe: '2 shots · ice · milk · caramel',
-    note: 'Cool, rich, and indulgent.',
-    image: caramel,
-  },
-  {
-    name: 'Espresso Tonic',
-    recipe: '1 shot · tonic water · ice · citrus',
-    note: 'Bold meets bright — surprisingly refreshing.',
-    image: tonic,
-  },
-]
 
 import { pageMeta } from '@/lib/seo'
 
@@ -276,11 +247,15 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {mixtures.map((m, i) => (
-              <div key={i} className="bg-espresso-50 rounded-2xl overflow-hidden border border-espresso-100 hover:shadow-lg transition-all duration-300 group">
+            {recipes.map(m => (
+              <Link
+                key={m.slug}
+                href={`/recipes/${m.slug}`}
+                className="bg-espresso-50 rounded-2xl overflow-hidden border border-espresso-100 hover:shadow-lg transition-all duration-300 group"
+              >
                 <div className="h-44 bg-espresso-100 flex items-center justify-center overflow-hidden relative">
                   <Image
-                    src={m.image}
+                    src={RECIPE_IMAGES[m.slug]}
                     alt={m.name}
                     fill
                     className="object-contain p-3 group-hover:scale-105 transition-transform duration-500"
@@ -293,10 +268,11 @@ export default function HomePage() {
                   >
                     {m.name}
                   </h3>
-                  <p className="text-espresso-400 text-xs font-mono mb-2">{m.recipe}</p>
-                  <p className="text-espresso-600 text-sm italic">{m.note}</p>
+                  <p className="text-espresso-400 text-xs font-mono mb-2">{recipeSummary(m)}</p>
+                  <p className="text-espresso-600 text-sm italic mb-3">{m.note}</p>
+                  <span className="text-espresso-700 group-hover:text-espresso-900 text-sm font-semibold">Get the recipe →</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
