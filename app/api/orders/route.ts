@@ -158,7 +158,19 @@ export async function POST(request: NextRequest) {
       deliveryDate, deliverySlots, voucher: applied, paymentMethod: method,
     }).catch(err => console.error('Email send failed:', err))
 
-    return NextResponse.json({ orderId })
+    // The figures this route actually charged, so the confirmation screen and
+    // the purchase event report them rather than the checkout page's preview —
+    // which can differ (a fresher delivery quote, a voucher re-priced here).
+    // All of it is the customer's own order; nothing they didn't send us.
+    return NextResponse.json({
+      orderId,
+      subtotal,
+      discount,
+      shipping,
+      total,
+      voucherCode: applied?.code ?? null,
+      items: pricedItems.map(({ id, quantity }) => ({ id, quantity })),
+    })
   } catch (err) {
     console.error('POST /api/orders error:', err)
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })

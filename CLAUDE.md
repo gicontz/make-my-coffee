@@ -347,6 +347,23 @@ That page renders its list of active trackers from the same config, but the
 prose around it was written for these three — re-read it if you add a
 different kind, and move `PRIVACY_UPDATED` in `lib/business.ts` when you do.
 
+### Conversion events (#33)
+`trackConversion()` in `lib/analytics.ts` sends `add_to_cart`,
+`begin_checkout` and `purchase` (Meta: `AddToCart`, `InitiateCheckout`,
+`Purchase`; TikTok: `AddToCart`, `InitiateCheckout`, `CompletePayment`).
+Adds are reported from `CartContext`, so every add path is covered; checkout
+start and purchase from `/order`. Consent is re-read at fire time, per
+category, so a mid-visit withdrawal holds even though a loaded script can't
+be unloaded.
+
+⚠️ **Purchase fires only after `POST /api/orders` succeeds, valued at the
+`total` that route returns.** Never recompute it in the browser: the server
+re-quotes delivery and caps free-delivery vouchers, so the checkout preview
+can differ from what was charged. The order id is the dedupe key
+(`transaction_id`, `purchase-<id>`). Items are priced from `lib/products.ts`.
+Nothing personal is sent; `/privacy` lists what is, so change one and you
+change the other.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
