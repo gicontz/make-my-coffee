@@ -6,6 +6,7 @@ import { CartProvider } from '@/context/CartContext'
 import { BUSINESS_ADDRESS, CONTACT_EMAIL, CONTACT_PHONE, LEGAL_NAME } from '@/lib/business'
 import { BLEND_ORIGIN } from '@/lib/seo'
 import { siteUrl } from '@/lib/siteUrl'
+import { SOCIAL_PROFILES } from '@/lib/social'
 
 /**
  * The shop's chrome — navbar, footer, cart state, chat widget.
@@ -43,6 +44,9 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         }
       : {}),
     ...(BUSINESS_ADDRESS ? { address: { '@type': 'PostalAddress', streetAddress: BUSINESS_ADDRESS, addressCountry: 'PH' } } : {}),
+    // Ties the social profiles to this site for search engines. The same list
+    // the footer renders, so the two cannot disagree.
+    ...(SOCIAL_PROFILES.length > 0 ? { sameAs: SOCIAL_PROFILES.map(p => p.url) } : {}),
   }
 
   return (

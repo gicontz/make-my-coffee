@@ -36,7 +36,7 @@ const mixtures = [
   },
 ]
 
-import { pageMeta } from '@/lib/seo'
+import { BLEND_ORIGIN, BLEND_ORIGIN_LABEL, pageMeta } from '@/lib/seo'
 
 export const metadata = pageMeta({
   title: 'Bottled espresso shots, delivered',
@@ -147,13 +147,13 @@ export default function HomePage() {
                   >
                     Aconchego
                   </p>
-                  <p className="text-espresso-200 text-sm mt-1">Cambodia × Indonesia</p>
+                  <p className="text-espresso-200 text-sm mt-1">{BLEND_ORIGIN_LABEL}</p>
                 </div>
               </div>
               {/* Floating tag */}
               <div className="absolute -bottom-5 -right-4 bg-white rounded-2xl shadow-lg border border-espresso-100 px-5 py-3">
                 <p className="text-espresso-400 font-bold text-sm">Signature Blend</p>
-                <p className="text-espresso-500 text-xs">Cambodia × Indonesia</p>
+                <p className="text-espresso-500 text-xs">{BLEND_ORIGIN_LABEL}</p>
               </div>
             </div>
 
@@ -173,7 +173,7 @@ export default function HomePage() {
                 "Aconchego" is a Portuguese word meaning warmth, comfort, and the feeling of being welcomed. It's everything we wanted our espresso to be.
               </p>
               <p className="text-espresso-600 leading-relaxed mb-8">
-                A carefully crafted blend of beans from Cambodia and Indonesia, roasted to reveal their natural richness — notes of dark chocolate, brown sugar, and a soft, lingering finish that makes every sip feel like home.
+                A carefully crafted blend of beans from {BLEND_ORIGIN}, roasted to reveal their natural richness — notes of dark chocolate, brown sugar, and a soft, lingering finish that makes every sip feel like home.
               </p>
               <div className="flex flex-wrap gap-3">
                 {['Dark Chocolate', 'Brown Sugar', 'Smooth Finish', 'Crafted Blend'].map(note => (
