@@ -1,3 +1,6 @@
+/** Every shot in every bottle is this size. */
+export const SHOT_ML = 30
+
 export interface Product {
   id: string
   name: string
