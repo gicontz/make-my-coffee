@@ -308,6 +308,25 @@ pages with nothing to rank, and a checkout form has no business in an index.
 `lib/products.ts`, delivery area from `lib/phLocations.ts`, freshness from
 `lib/freshness.ts`.
 
+## About page & social links
+`/about` (`app/(storefront)/about/`) states only what a module owns — the
+origin from `BLEND_ORIGIN`, delivery rules from the checkout's own modules, and
+the freshness and returns copy verbatim from `lib/freshness.ts`.
+
+⚠️ **The founder story is `FOUNDER_STORY` in `lib/about.ts`, and it is `null`
+until the founders supply it.** `null` leaves the section off the page. Never
+draft it — an invented founder story on a food brand is a trust claim that
+can't be walked back.
+
+Social profiles come from env (`SOCIAL_FACEBOOK_URL`, `SOCIAL_INSTAGRAM_URL`,
+`SOCIAL_TIKTOK_URL`) through `lib/social.ts`, which drops anything that isn't
+an https URL on that network's domain. The footer and `/about` render them
+through `components/SocialLinks.tsx` (icons in `SocialIcon.tsx`, single-colour
+`currentColor` so they take the espresso palette), and the Organization
+`sameAs` reads the same `SOCIAL_PROFILES`; none set → none rendered.
+`tests/about.test.ts` fails on a hardcoded handle or a retyped blend origin
+anywhere in the storefront.
+
 ## Freshness & returns — a food claim, so read `lib/freshness.ts` first
 Everything is recorded now and stated from one module:
 
