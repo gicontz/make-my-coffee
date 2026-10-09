@@ -279,6 +279,7 @@ Driven by the marketing plan's "fix before any marketing" list.
 |---|---|
 | Titles, descriptions, canonicals, OG/Twitter | `lib/seo.ts` (`pageMeta`) |
 | Product pages | `app/(storefront)/shop/[id]/` — static, one per bottle, Product JSON-LD |
+| FAQ | `app/(storefront)/faq/` from `lib/faq.ts` — FAQPage JSON-LD |
 | Organization JSON-LD | `app/(storefront)/layout.tsx` |
 | Sitemap / robots | `app/sitemap.ts`, `app/robots.ts` |
 
@@ -290,6 +291,15 @@ food product, a labelling risk.
 **Per-drink price is derived, never typed.** `pricePerShot()` in
 `lib/products.ts` is bottle ÷ shots; the hero, the shop cards and the product
 pages all read it, so a price change can't leave stale copy behind.
+
+**Every FAQ answer is assembled in `lib/faq.ts` from the module that owns the
+fact** — provinces, slots, payment methods, freshness — and the FAQPage
+JSON-LD is fed the same strings the page renders. Adding a question means
+building its answer from code, never typing a fact into it;
+`tests/faq.test.ts` fails on a retyped province, wallet, threshold, hour or
+day count, on any peso figure that isn't a per-drink price, on *any* digit
+in the delivery-fee answer (not even the free-delivery threshold), and on a
+storage answer missing `REFRIGERATE`.
 
 `/cart` and `/order` are `noindex` (and absent from the sitemap): per-visitor
 pages with nothing to rank, and a checkout form has no business in an index.
