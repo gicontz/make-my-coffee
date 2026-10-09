@@ -59,7 +59,8 @@ function period(p: keyof typeof PERIOD_LABEL): string {
   return PERIOD_LABEL[p].toLowerCase().replace(/\s*–\s*/g, '–')
 }
 
-function earliestDay(): string {
+/** "tomorrow" — the earliest delivery date checkout will accept, in words. */
+export function earliestDay(): string {
   return MIN_LEAD_DAYS === 1 ? 'tomorrow' : `${MIN_LEAD_DAYS} days from today`
 }
 
