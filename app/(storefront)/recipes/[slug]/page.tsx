@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import bottleImg from '@/app/assets/bottle.png'
 import { products } from '@/lib/products'
 import {
   drinksPerBottle,
@@ -15,6 +14,7 @@ import {
 import { SITE_NAME, pageMeta } from '@/lib/seo'
 import { siteUrl } from '@/lib/siteUrl'
 import { RECIPE_IMAGES } from '../images'
+import { productImage } from '@/app/(storefront)/shop/images'
 
 const serif = { fontFamily: 'var(--font-playfair), Georgia, serif' }
 
@@ -153,7 +153,7 @@ export default function RecipePage({ params }: { params: { slug: string } }) {
                   className="flex items-center gap-4 bg-white rounded-2xl border border-espresso-100 hover:border-espresso-400 p-5 transition-colors"
                 >
                   <div className="w-16 h-16 bg-espresso-50 rounded-xl flex-shrink-0 relative">
-                    <Image src={bottleImg} alt="" fill sizes="64px" className="object-contain p-2" />
+                    <Image src={productImage(product.id)} alt="" fill sizes="64px" className="object-contain p-1" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-espresso-900 font-bold">{product.name}</p>
