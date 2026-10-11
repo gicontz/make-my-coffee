@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
-import bottleImg from '@/app/assets/bottle.png'
+import { productImage } from '@/app/(storefront)/shop/images'
 import { FLAT_SHIPPING_FEE, FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 
 export default function CartPage() {
@@ -71,7 +71,7 @@ export default function CartPage() {
               >
                 {/* Thumbnail */}
                 <div className="w-full sm:w-24 h-24 bg-espresso-100 rounded-xl flex-shrink-0 relative overflow-hidden">
-                  <Image src={bottleImg} alt={item.product.name} fill className="object-contain p-1.5" />
+                  <Image src={productImage(item.product.id)} alt={item.product.name} fill sizes="64px" className="object-contain p-1.5" />
                   <div className="absolute bottom-1.5 right-1.5 bg-espresso-900/80 backdrop-blur-sm text-espresso-50 rounded-full px-2 py-0.5 flex items-center gap-1 pointer-events-none">
                     <span className="font-bold text-xs" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>{item.product.shots}</span>
                     <span className="text-espresso-400 text-[8px] uppercase tracking-wider">shots</span>

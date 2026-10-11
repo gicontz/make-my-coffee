@@ -6,7 +6,7 @@ import { pricePerShot, products } from '@/lib/products'
 import type { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
-import bottleImg from '@/app/assets/bottle.png'
+import { productImage, productImageAlt } from './images'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
 
 export default function ShopPage() {
@@ -54,12 +54,13 @@ export default function ShopPage() {
               )}
 
               {/* Product visual */}
-              <div className="h-64 bg-espresso-50 flex items-center justify-center relative overflow-hidden">
+              <div className="h-72 bg-espresso-50 flex items-center justify-center relative overflow-hidden">
                 <Image
-                  src={bottleImg}
-                  alt={product.name}
+                  src={productImage(product.id)}
+                  alt={productImageAlt(product)}
                   fill
-                  className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                  sizes="(min-width: 1024px) 400px, 100vw"
+                  className="object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                 />
                 {/* Shot count pill */}
                 <div className="absolute bottom-3 right-3 z-10 bg-espresso-900/80 backdrop-blur-sm text-espresso-50 rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">

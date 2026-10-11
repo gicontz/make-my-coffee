@@ -51,7 +51,7 @@ app/
       stats/route.ts            GET — dashboard aggregates
       vouchers/route.ts         GET list / POST create  (admin-cookie guarded)
       vouchers/[id]/route.ts    PATCH edit or toggle / DELETE (admin-cookie guarded)
-  assets/                       bottle.png, hero_splash.png, flavors/*.png
+  assets/                       bottle.png, hero_bottles.png, bottles/*.png, flavors/*.png
 components/
   Navbar.tsx, Footer.tsx, HeroSection.tsx
   DeliveryMapPicker.tsx          Leaflet pin picker (dynamic-imported, ssr:false), see D10

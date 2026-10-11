@@ -6,14 +6,16 @@ import { useState } from 'react'
 import { pricePerShot, products } from '@/lib/products'
 import type { Product } from '@/lib/products'
 import { useCart } from '@/context/CartContext'
-import heroSplash from '@/app/assets/hero_splash.png'
-import bottleImg from '@/app/assets/bottle.png'
+import heroBottles from '@/app/assets/hero_bottles.png'
+import { productImage, productImageAlt, SIZE_COMPARISON_ALT } from '@/app/(storefront)/shop/images'
 
-/* Label anchor points as % of the image container — one per bottle (left → center → right) */
+/* Label anchor points as % of the image container — one per bottle (left → center → right).
+   Each sits on the liquid above that bottle's printed label, so the pill never covers it.
+   Measured on hero_bottles.png; re-measure if that image is regenerated. */
 const LABEL_ANCHORS = [
-  { left: '14%', top: '52%' },   // left bottle
-  { left: '47%', top: '44%' },   // center bottle (taller)
-  { left: '78%', top: '52%' },   // right bottle
+  { left: '23%', top: '35%' },   // 4-shot, front left
+  { left: '52%', top: '26%' },   // 7-shot, centre
+  { left: '87%', top: '19%' },   // 10-shot, back right (tilted)
 ]
 
 export default function HeroSection() {
@@ -96,13 +98,20 @@ export default function HeroSection() {
             {/* ── Right: image + overlaid bottle labels ── */}
             <div className="flex-1 relative flex items-center justify-center min-h-[380px] lg:min-h-[480px] w-full">
               {/* The image — transparent PNG, blends into dark bg */}
-              <div className="relative w-full max-w-[540px]">
+              <div className="relative w-full max-w-[480px]">
+                {/* Warm glow behind the bottles. Done in CSS rather than baked into the
+                    PNG: a soft gradient in an 8-bit alpha channel bands into visible rings. */}
+                <div
+                  aria-hidden
+                  className="absolute -inset-[12%] pointer-events-none"
+                  style={{ background: 'radial-gradient(ellipse 50% 45% at 50% 55%, rgba(200,134,10,0.32), rgba(200,134,10,0) 70%)' }}
+                />
                 <Image
-                  src={heroSplash}
-                  alt="Aconchego espresso bottles"
+                  src={heroBottles}
+                  alt={SIZE_COMPARISON_ALT}
                   priority
                   quality={90}
-                  className="w-full h-auto object-contain drop-shadow-2xl"
+                  className="relative w-full h-auto object-contain drop-shadow-2xl"
                 />
 
                 {/* Labels pinned to each bottle */}
@@ -248,8 +257,8 @@ export default function HeroSection() {
             {/* Top visual */}
             <div className="h-52 bg-espresso-100 flex items-center justify-center relative overflow-hidden">
               <Image
-                src={bottleImg}
-                alt={modalProduct.name}
+                src={productImage(modalProduct.id)}
+                alt={productImageAlt(modalProduct)}
                 fill
                 className="object-contain p-4"
               />

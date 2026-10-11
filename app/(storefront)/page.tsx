@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { products } from '@/lib/products'
 import HeroSection from '@/components/HeroSection'
-import bottleImg from '@/app/assets/bottle.png'
+import { productImage, productImageAlt } from '@/app/(storefront)/shop/images'
 import classicLatte from '@/app/assets/flavors/classic_latte.png'
 import honeyOat from '@/app/assets/flavors/honey_oat.png'
 import caramel from '@/app/assets/flavors/caramel.png'
@@ -79,8 +79,8 @@ export default function HomePage() {
                 {/* Visual */}
                 <div className="h-48 bg-espresso-100 flex items-center justify-center relative overflow-hidden">
                   <Image
-                    src={bottleImg}
-                    alt={product.name}
+                    src={productImage(product.id)}
+                    alt={productImageAlt(product)}
                     fill
                     className="object-contain p-3"
                   />

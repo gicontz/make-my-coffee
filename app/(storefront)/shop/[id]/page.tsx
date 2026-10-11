@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import bottleImg from '@/app/assets/bottle.png'
+import { productImage, productImageAlt } from '../images'
+import SizeComparison from '@/components/SizeComparison'
 import { pricePerShot, productById, products } from '@/lib/products'
 import { PROVINCES } from '@/lib/phLocations'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
@@ -53,7 +54,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     '@type': 'Product',
     name: product.name,
     description: product.description,
-    image: `${siteUrl()}/og-image.png`,
+    image: `${siteUrl()}${productImage(product.id).src}`,
     brand: { '@type': 'Brand', name: 'Aconchego' },
     category: 'Coffee',
     offers: {
@@ -90,8 +91,9 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </span>
             )}
             <Image
-              src={bottleImg}
-              alt={`${product.name} — a ${product.volume} bottle holding ${product.shots} espresso shots`}
+              src={productImage(product.id)}
+              alt={productImageAlt(product)}
+              sizes="320px"
               className="w-full max-w-xs h-auto object-contain"
               priority
             />
@@ -142,6 +144,11 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
+        <div className="mt-16 bg-white rounded-2xl border border-espresso-100 px-6 py-8">
+          <h2 className="text-espresso-900 text-2xl font-bold mb-6 text-center" style={serif}>How the sizes compare</h2>
+          <SizeComparison current={product.id} />
+        </div>
+
         <div className="mt-16">
           <h2 className="text-espresso-900 text-2xl font-bold mb-6" style={serif}>Other sizes</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -152,7 +159,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 className="flex items-center gap-4 bg-white rounded-2xl border border-espresso-100 hover:border-espresso-400 p-5 transition-colors"
               >
                 <div className="w-16 h-16 bg-espresso-50 rounded-xl flex-shrink-0 relative">
-                  <Image src={bottleImg} alt="" fill className="object-contain p-2" />
+                  <Image src={productImage(other.id)} alt="" fill sizes="64px" className="object-contain p-1" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-espresso-900 font-bold">{other.name}</p>
