@@ -33,6 +33,9 @@ export default function Navbar() {
             <Link href="/shop" className="text-espresso-200 hover:text-espresso-300 text-sm font-medium tracking-wide transition-colors">
               Shop
             </Link>
+            <Link href="/about" className="text-espresso-200 hover:text-espresso-300 text-sm font-medium tracking-wide transition-colors">
+              About
+            </Link>
           </div>
 
           <div className="flex items-center gap-4">
@@ -82,6 +85,7 @@ export default function Navbar() {
           <div className="md:hidden border-t border-espresso-800 py-4 flex flex-col gap-3">
             <Link href="/" className="text-espresso-200 hover:text-espresso-300 text-sm font-medium px-2 transition-colors" onClick={() => setMobileOpen(false)}>Home</Link>
             <Link href="/shop" className="text-espresso-200 hover:text-espresso-300 text-sm font-medium px-2 transition-colors" onClick={() => setMobileOpen(false)}>Shop</Link>
+            <Link href="/about" className="text-espresso-200 hover:text-espresso-300 text-sm font-medium px-2 transition-colors" onClick={() => setMobileOpen(false)}>About</Link>
           </div>
         )}
       </div>

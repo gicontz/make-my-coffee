@@ -40,6 +40,7 @@ const rendered = (rel: string) =>
 const SURFACES = [
   '../app/(storefront)/shop/page.tsx',
   '../app/(storefront)/shop/[id]/page.tsx',
+  '../app/(storefront)/about/page.tsx',
 ]
 
 test('the window is a best-before, never a use-by', () => {

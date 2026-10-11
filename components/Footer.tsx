@@ -2,6 +2,8 @@ import Link from 'next/link'
 import CookieSettingsLink from './CookieSettingsLink'
 import Image from 'next/image'
 import wordmark from '@/app/assets/logo-wordmark.png'
+import { BLEND_ORIGIN, BLEND_ORIGIN_LABEL } from '@/lib/seo'
+import SocialLinks from './SocialLinks'
 
 export default function Footer() {
   return (
@@ -15,13 +17,14 @@ export default function Footer() {
               className="h-9 w-auto brightness-0 invert mb-4"
             />
             <p className="text-espresso-400 text-sm leading-relaxed">
-              Pure espresso shots crafted for those who love their coffee their own way. A signature blend from Cambodia &amp; Indonesia.
+              Pure espresso shots crafted for those who love their coffee their own way. A signature blend from {BLEND_ORIGIN}.
             </p>
+            <SocialLinks variant="dark" className="mt-5" />
           </div>
           <div>
             <h4 className="text-espresso-200 font-semibold text-xs tracking-widest uppercase mb-3">Quick Links</h4>
             <ul className="space-y-2">
-              {[['/', 'Home'], ['/shop', 'Shop'], ['/cart', 'Cart'], ['/faq', 'FAQ'], ['/contact', 'Contact'], ['/privacy', 'Privacy'], ['/cookies', 'Cookies']].map(([href, label]) => (
+              {[['/', 'Home'], ['/shop', 'Shop'], ['/about', 'About'], ['/cart', 'Cart'], ['/faq', 'FAQ'], ['/contact', 'Contact'], ['/privacy', 'Privacy'], ['/cookies', 'Cookies']].map(([href, label]) => (
                 <li key={href}>
                   <Link href={href} className="text-espresso-400 hover:text-espresso-300 text-sm transition-colors">{label}</Link>
                 </li>
@@ -40,7 +43,7 @@ export default function Footer() {
         </div>
         <div className="border-t border-espresso-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-espresso-600 text-xs">© {new Date().getFullYear()} Make My Coffee. All rights reserved.</p>
-          <p className="text-espresso-700 text-xs">Aconchego · Signature Blend · Cambodia × Indonesia</p>
+          <p className="text-espresso-700 text-xs">Aconchego · Signature Blend · {BLEND_ORIGIN_LABEL}</p>
         </div>
       </div>
     </footer>

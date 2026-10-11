@@ -20,6 +20,9 @@ export const SITE_NAME = 'Make My Coffee'
  */
 export const BLEND_ORIGIN = 'Cambodia & Indonesia'
 
+/** The same origin as a label — "Cambodia × Indonesia" — for badges and tags. */
+export const BLEND_ORIGIN_LABEL = BLEND_ORIGIN.replace(' & ', ' × ')
+
 const OG_IMAGE = '/og-image.png'
 
 interface PageMetaInput {
