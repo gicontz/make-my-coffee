@@ -364,6 +364,16 @@ can differ from what was charged. The order id is the dedupe key
 Nothing personal is sent; `/privacy` lists what is, so change one and you
 change the other.
 
+⚠️ **"Nothing personal" depends on the pixels' own settings, not just our
+code.** Both dashboards ship with *automatic advanced matching* on: the vendor
+script reads the checkout form and sends hashed name, email, phone, zip and city
+with every event. Verified on the wire for both pixels on 2026-10-11.
+- **Meta** is forced off in code — `fbq('set','autoConfig',false,id)` before
+  `init` in `components/Analytics.tsx`, which also stops its automatic
+  button-click events. `tests/metaPixel.test.ts` fails if it goes.
+- **TikTok has no verified code switch.** Automatic Advanced Matching must be
+  off in TikTok Events Manager → pixel → Settings, or `/privacy` is wrong.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
