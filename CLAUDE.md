@@ -295,9 +295,36 @@ pages all read it, so a price change can't leave stale copy behind.
 pages with nothing to rank, and a checkout form has no business in an index.
 
 ⚠️ **Product pages state only what the code knows** — price and shots from
-`lib/products.ts`, delivery area from `lib/phLocations.ts`. Shelf life,
-storage and returns are deliberately absent: nothing records them, and a guess
-about how long a perishable keeps is not one to publish.
+`lib/products.ts`, delivery area from `lib/phLocations.ts`, freshness from
+`lib/freshness.ts`.
+
+## Freshness & returns — a food claim, so read `lib/freshness.ts` first
+Everything is recorded now and stated from one module:
+
+- **Made to order** — brewed on the delivery date the customer picked, arriving
+  that same day. There is no stock; the `InStock` Product schema leans on this.
+- **No cold chain in transit**, *because* brewing and delivery are the same day
+  — not because it is shelf-stable.
+- **Fridge from arrival**, sealed or opened.
+- **7 days from delivery, refrigerated**, one window for sealed and opened
+  alike — a best-before for flavour, never a use-by.
+- **Replace or refund** on a photo for anything wrong, damaged or spoiled; no
+  taking back opened bottles.
+
+⚠️ **These sentences are load-bearing on each other.** "Needs no refrigeration"
+is true only of the *journey*; "7 days" is true only *refrigerated*. Either
+published alone is a wrong claim, so surfaces render them together — prefer
+`FRESHNESS_SUMMARY` over cherry-picking constants, and never paraphrase.
+
+⚠️ **One window, by decision.** Sealed and opened get the same 7 days. Two
+numbers invite a customer to misremember which applies, and the honest answer
+was the same either way.
+
+The bot may state all of it but may **not** promise a specific refund or
+replacement — that is a person's call. `tests/freshness.test.ts` fails if any
+surface splits the pair, retypes the window in rendered copy, reframes it as a
+use-by, gives a second day count, or leads the returns copy with the exclusion
+instead of the remedy.
 
 ## Cookie policy
 `/cookies` is built from `lib/cookies.ts`, and so is the code that sets them —
