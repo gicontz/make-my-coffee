@@ -419,8 +419,17 @@ different kind, and move `PRIVACY_UPDATED` in `lib/business.ts` when you do.
 `Purchase`; TikTok: `AddToCart`, `InitiateCheckout`, `CompletePayment`).
 Adds are reported from `CartContext`, so every add path is covered; checkout
 start and purchase from `/order`. Consent is re-read at fire time, per
-category, so a mid-visit withdrawal holds even though a loaded script can't
-be unloaded.
+category, so our own events stop the moment it is withdrawn.
+
+⚠️ **Withdrawing consent reloads the page** (`withdrawsConsent()`, called from
+`decide()` in `components/Analytics.tsx`). A loaded tracker can't be unloaded,
+and TikTok's script kept sending its own engagement and click reports after a
+mid-visit "Reject all" — only leaving the page stops it. The reload happens
+only when a category that was on goes off, and only once the new answer is
+actually stored. The cart survives (localStorage); anything half-typed in the
+checkout form does not. Verified on the wire: nothing reaches any vendor after
+the reload; at most one last beacon each from GA4 and TikTok as the page
+closes. `tests/withdrawal.test.ts` pins it.
 
 ⚠️ **Purchase fires only after `POST /api/orders` succeeds, valued at the
 `total` that route returns.** Never recompute it in the browser: the server

@@ -12,6 +12,7 @@ import {
   categoriesInUse,
   hasTrackers,
   readConsent,
+  withdrawsConsent,
   writeConsent,
   type ConsentCategory,
   type ConsentState,
@@ -45,7 +46,17 @@ export default function Analytics() {
   }, [])
 
   const decide = useCallback((state: ConsentState) => {
+    const withdrawn = withdrawsConsent(readConsent(), state)
     writeConsent(state)
+    // A loaded tracker can't be unloaded, so taking consent back reloads the
+    // page; it comes back without the script. Only once the new answer is
+    // actually stored — if storage refused the write, a reload would read the
+    // old "yes" and load everything again.
+    const saved = readConsent()
+    if (withdrawn && saved?.analytics === state.analytics && saved?.marketing === state.marketing) {
+      window.location.reload()
+      return
+    }
     setConsent(state)
     setPanelOpen(false)
   }, [])

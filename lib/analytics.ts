@@ -178,6 +178,27 @@ export function categoriesInUse(ids: TrackerIds = TRACKERS): ConsentCategory[] {
   return used
 }
 
+/**
+ * Whether a new choice takes back something the visitor had allowed, for a
+ * category this deployment actually loads.
+ *
+ * That case needs the page reloaded. A tracker's script cannot be unloaded:
+ * our own events stop the moment consent is withdrawn (trackConversion re-reads
+ * it), but TikTok's script keeps sending its own engagement, click and health
+ * reports for as long as the page lives — seen on the wire. Leaving the page is
+ * the only thing that makes "Reject" mean nothing more is sent.
+ *
+ * Granting, re-saving the same choice, or a first answer never reloads.
+ */
+export function withdrawsConsent(
+  before: ConsentState | null,
+  after: ConsentState,
+  ids: TrackerIds = TRACKERS,
+): boolean {
+  if (!before) return false
+  return categoriesInUse(ids).some(category => before[category] && !after[category])
+}
+
 export const CATEGORY_LABEL: Record<ConsentCategory, { title: string; blurb: string }> = {
   analytics: {
     title: 'Analytics',
