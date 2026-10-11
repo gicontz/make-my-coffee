@@ -12,6 +12,7 @@ import {
   categoriesInUse,
   hasTrackers,
   readConsent,
+  withdrawsConsent,
   writeConsent,
   type ConsentCategory,
   type ConsentState,
@@ -45,7 +46,17 @@ export default function Analytics() {
   }, [])
 
   const decide = useCallback((state: ConsentState) => {
+    const withdrawn = withdrawsConsent(readConsent(), state)
     writeConsent(state)
+    // A loaded tracker can't be unloaded, so taking consent back reloads the
+    // page; it comes back without the script. Only once the new answer is
+    // actually stored — if storage refused the write, a reload would read the
+    // old "yes" and load everything again.
+    const saved = readConsent()
+    if (withdrawn && saved?.analytics === state.analytics && saved?.marketing === state.marketing) {
+      window.location.reload()
+      return
+    }
     setConsent(state)
     setPanelOpen(false)
   }, [])
@@ -256,6 +267,12 @@ gtag('js',new Date());gtag('config','${id}',{anonymize_ip:true});`}
   )
 }
 
+// autoConfig off, before init. Left on, the pixel's dashboard settings turn on
+// "automatic advanced matching" (fbevents.js reads the checkout form and sends
+// hashed name, email, phone, zip and city with every event) and automatic
+// button-click events — neither of which /privacy allows, and the clicks keep
+// firing after a mid-visit "Reject all", since a loaded script can't be
+// unloaded. This holds whatever the dashboard says.
 function MetaPixel({ id }: { id: string }) {
   return (
     <Script id="meta-pixel" strategy="afterInteractive">
@@ -264,7 +281,7 @@ n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
 n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
 document,'script','https://connect.facebook.net/en_US/fbevents.js');
-fbq('init','${id}');fbq('track','PageView');`}
+fbq('set','autoConfig',false,'${id}');fbq('init','${id}');fbq('track','PageView');`}
     </Script>
   )
 }

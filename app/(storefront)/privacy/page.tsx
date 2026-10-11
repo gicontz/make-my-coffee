@@ -76,6 +76,11 @@ export default function PrivacyPage() {
               your IP address, and your browser and device type.
             </p>
             <p>
+              They are also told when you add a bottle to your cart, when you reach checkout, and when you place
+              an order — which bottles, how many, the amount, any voucher code, and the order number, so the same
+              order is not counted twice. They are never sent your name, email, phone number or address.
+            </p>
+            <p>
               <strong className="text-espresso-800">Nothing loads until you say yes.</strong> The banner appears
               on your first visit; reject it, or simply ignore it, and none of these scripts are fetched, no
               cookie of theirs is set and nothing is sent to them. The site and checkout work identically either

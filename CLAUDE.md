@@ -413,6 +413,42 @@ That page renders its list of active trackers from the same config, but the
 prose around it was written for these three — re-read it if you add a
 different kind, and move `PRIVACY_UPDATED` in `lib/business.ts` when you do.
 
+### Conversion events (#33)
+`trackConversion()` in `lib/analytics.ts` sends `add_to_cart`,
+`begin_checkout` and `purchase` (Meta: `AddToCart`, `InitiateCheckout`,
+`Purchase`; TikTok: `AddToCart`, `InitiateCheckout`, `CompletePayment`).
+Adds are reported from `CartContext`, so every add path is covered; checkout
+start and purchase from `/order`. Consent is re-read at fire time, per
+category, so our own events stop the moment it is withdrawn.
+
+⚠️ **Withdrawing consent reloads the page** (`withdrawsConsent()`, called from
+`decide()` in `components/Analytics.tsx`). A loaded tracker can't be unloaded,
+and TikTok's script kept sending its own engagement and click reports after a
+mid-visit "Reject all" — only leaving the page stops it. The reload happens
+only when a category that was on goes off, and only once the new answer is
+actually stored. The cart survives (localStorage); anything half-typed in the
+checkout form does not. Verified on the wire: nothing reaches any vendor after
+the reload; at most one last beacon each from GA4 and TikTok as the page
+closes. `tests/withdrawal.test.ts` pins it.
+
+⚠️ **Purchase fires only after `POST /api/orders` succeeds, valued at the
+`total` that route returns.** Never recompute it in the browser: the server
+re-quotes delivery and caps free-delivery vouchers, so the checkout preview
+can differ from what was charged. The order id is the dedupe key
+(`transaction_id`, `purchase-<id>`). Items are priced from `lib/products.ts`.
+Nothing personal is sent; `/privacy` lists what is, so change one and you
+change the other.
+
+⚠️ **"Nothing personal" depends on the pixels' own settings, not just our
+code.** Both dashboards ship with *automatic advanced matching* on: the vendor
+script reads the checkout form and sends hashed name, email, phone, zip and city
+with every event. Verified on the wire for both pixels on 2026-10-11.
+- **Meta** is forced off in code — `fbq('set','autoConfig',false,id)` before
+  `init` in `components/Analytics.tsx`, which also stops its automatic
+  button-click events. `tests/metaPixel.test.ts` fails if it goes.
+- **TikTok has no verified code switch.** Automatic Advanced Matching must be
+  off in TikTok Events Manager → pixel → Settings, or `/privacy` is wrong.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`
