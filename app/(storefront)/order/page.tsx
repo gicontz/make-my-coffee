@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import Link from 'next/link'
-import bottleImg from '@/app/assets/bottle.png'
+import { productImage } from '@/app/(storefront)/shop/images'
 import { FLAT_SHIPPING_FEE, FREE_SHIPPING_MIN_SUBTOTAL, isFreeShippingEligible, type ShippingQuote } from '@/lib/shipping'
 import { PROVINCES, citiesFor, zipFor, zipMayVaryByArea } from '@/lib/phLocations'
 import { PERIOD_LABEL, DELIVERY_SLOT_IDS, slotsInPeriod, slotLabel, validateDeliverySlots, type SlotPeriod } from '@/lib/deliverySlots'
@@ -686,7 +686,7 @@ export default function OrderPage() {
                   {items.map(item => (
                     <div key={item.product.id} className="flex items-center gap-3">
                       <div className="w-11 h-11 bg-espresso-100 rounded-xl flex-shrink-0 relative overflow-hidden">
-                        <Image src={bottleImg} alt={item.product.name} fill className="object-contain p-1" />
+                        <Image src={productImage(item.product.id)} alt={item.product.name} fill sizes="64px" className="object-contain p-1" />
                         <div className="absolute bottom-0.5 right-0.5 bg-espresso-900/80 text-espresso-50 rounded-full px-1.5 py-px pointer-events-none">
                           <span className="font-bold text-[9px]" style={{ fontFamily: 'var(--font-playfair), Georgia, serif' }}>{item.product.shots}s</span>
                         </div>
