@@ -1,4 +1,4 @@
-// Customer reviews — the pure half. Schema in lib/migrations/0009; the
+// Customer reviews — the pure half. Schema in lib/migrations/0010; the
 // database half is lib/reviewStore.ts.
 //
 // Relative imports with extensions, like lib/email.ts, so tests/reviews.test.ts
@@ -14,7 +14,7 @@
 import { products } from './products.ts'
 import { siteUrl } from './siteUrl.ts'
 
-/** Mirrors the CHECK constraints in migration 0009 — the test pins the pair. */
+/** Mirrors the CHECK constraints in migration 0010 — the test pins the pair. */
 export const REVIEW_BODY_MAX = 1000
 export const DISPLAY_NAME_MAX = 40
 

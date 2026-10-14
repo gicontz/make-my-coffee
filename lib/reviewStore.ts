@@ -1,4 +1,4 @@
-// Server-only state for customer reviews. Schema in lib/migrations/0009; the
+// Server-only state for customer reviews. Schema in lib/migrations/0010; the
 // pure rules are lib/reviews.ts.
 //
 // ⚠️ Never seed, write or invent a review — see the header of lib/reviews.ts.

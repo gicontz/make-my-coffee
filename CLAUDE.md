@@ -330,7 +330,7 @@ name.
 | Piece | File |
 |---|---|
 | Rules, tokens, JSON-LD (pure) | `lib/reviews.ts` |
-| Storage, cached product read | `lib/reviewStore.ts` (migration 0009) |
+| Storage, cached product read | `lib/reviewStore.ts` (migration 0010) |
 | Customer form | `app/(storefront)/review/` |
 | Public API | `app/api/reviews/` — submit, and `request/` to look a token up |
 | Moderation | `/admin/reviews`, `app/api/admin/reviews/` |

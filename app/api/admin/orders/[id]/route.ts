@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
       // The review invitation rides on the delivered email (issue #37), the
       // first time only (see issueReviewToken). A token that can't be issued
-      // (migration 0009 not applied, a DB blip) costs the invitation, never
+      // (migration 0010 not applied, a DB blip) costs the invitation, never
       // the delivered notice.
       if (order_status === 'delivered') {
         const token = await issueReviewToken(id)

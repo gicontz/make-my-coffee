@@ -89,7 +89,7 @@ test('the review lookup returns nothing personal beyond the first name', () => {
 
 test('the input limits match the database constraints', () => {
   // Both DDL files: the migration for the live DB, db-setup.sql for e2e.
-  for (const file of ['lib/migrations/0009_add_reviews.sql', 'lib/db-setup.sql']) {
+  for (const file of ['lib/migrations/0010_add_reviews.sql', 'lib/db-setup.sql']) {
     const ddl = read(file)
     assert.match(ddl, new RegExp(`char_length\\(body\\) BETWEEN 1 AND ${REVIEW_BODY_MAX}\\b`), file)
     assert.match(ddl, new RegExp(`char_length\\(display_name\\) BETWEEN 1 AND ${DISPLAY_NAME_MAX}\\b`), file)

@@ -27,7 +27,7 @@
 -- Additive only, so a code rollback across this migration stays safe (issue #9).
 --
 -- Run once against the Neon DB (no migration runner here; apply manually via
--- the Neon SQL editor, same as 0001-0008).
+-- the Neon SQL editor, same as 0001-0009).
 
 CREATE TABLE IF NOT EXISTS review_requests (
   order_id    INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,

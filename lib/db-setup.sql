@@ -95,7 +95,7 @@ ALTER TABLE orders
 
 UPDATE orders SET paid_at = created_at WHERE payment_status = 'paid' AND paid_at IS NULL;
 
--- ── Reviews (0009) — issue #37 ──
+-- ── Reviews (0010) — issue #37 ──
 -- Here as well as in the migration because the delivered transition now
 -- issues a review token, and e2e applies this file rather than migrations.
 -- No INSERT, ever: see the hard rule at the top of lib/reviews.ts.
