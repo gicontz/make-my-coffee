@@ -24,7 +24,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /**
  * Written to match what the code actually does, not from a template — the
- * collection list mirrors the `orders` and `chat_*` tables, and the processor
+ * collection list mirrors the `orders`, `reviews` and `chat_*` tables, and the processor
  * list is every external host the app talks to. If either changes, this page
  * is wrong until it is updated.
  */
@@ -56,6 +56,12 @@ export default function PrivacyPage() {
 
           <p><strong className="text-espresso-800">When you use a voucher:</strong> your email address, so codes
           limited to one use per customer can be enforced.</p>
+
+          <p><strong className="text-espresso-800">When you review an order:</strong> your star rating, what you
+          wrote, the name you chose to show with it, and which order it was for. We read every review before it is
+          published; once published, the rating, the text and that name are public on our product pages — your
+          email, address and order details never are. The review link in your delivery email works only for your
+          order.</p>
 
           <p><strong className="text-espresso-800">When you use the chat:</strong> the messages you send, and a
           random identifier stored in a cookie so the conversation is still there if you reload the page. That
@@ -106,7 +112,8 @@ export default function PrivacyPage() {
 
         <Section title="Why we hold it">
           <p>To take, price, deliver and confirm your order; to send you order confirmations and delivery updates;
-          to answer your questions; to prevent voucher abuse; and to keep ordinary business records of sales.</p>
+          to answer your questions; to prevent voucher abuse; to publish the reviews customers choose to write; and
+          to keep ordinary business records of sales.</p>
           <p>We do not send marketing email. Every email we send relates to an order you actually placed.</p>
         </Section>
 
@@ -156,8 +163,8 @@ export default function PrivacyPage() {
 
         <Section title="How long we keep it">
           <p>Order records are kept as long as we need them for business and tax records. Chat conversations are kept
-          so we can follow up on what you asked. Ask us to delete either and we will, except where we are required to
-          keep a record of a completed sale.</p>
+          so we can follow up on what you asked. Reviews are kept while they are useful to other customers. Ask us to
+          delete any of these and we will, except where we are required to keep a record of a completed sale.</p>
         </Section>
 
         <Section title="Your rights">
