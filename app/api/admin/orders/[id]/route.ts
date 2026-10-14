@@ -3,6 +3,8 @@ import { sql } from '@/lib/db'
 import { isAdminAuthenticated } from '@/lib/session'
 import { isPaymentMethod } from '@/lib/paymentMethods'
 import { notifiesCustomer, sendOrderStatusEmail, statusEmailFromOrderRow } from '@/lib/email'
+import { issueReviewToken } from '@/lib/reviewStore'
+import { reviewUrl } from '@/lib/reviews'
 
 const VALID_ORDER_STATUSES = ['pending', 'approved', 'shipped', 'delivered', 'cancelled']
 const VALID_PAYMENT_STATUSES = ['unpaid', 'paid']
@@ -38,7 +40,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // provider having a bad day must not make the admin think the status
     // update failed, because it didn't — it's already committed above.
     if (changed.length && notifiesCustomer(order_status)) {
-      await sendOrderStatusEmail(statusEmailFromOrderRow(changed[0], order_status))
+      const email = statusEmailFromOrderRow(changed[0], order_status)
+
+      // The review invitation rides on the delivered email (issue #37), the
+      // first time only (see issueReviewToken). A token that can't be issued
+      // (migration 0009 not applied, a DB blip) costs the invitation, never
+      // the delivered notice.
+      if (order_status === 'delivered') {
+        const token = await issueReviewToken(id)
+          .catch(err => { console.error(`Review link failed for order ${id}:`, err); return null })
+        if (token) email.reviewUrl = reviewUrl(token)
+      }
+
+      await sendOrderStatusEmail(email)
         .catch(err => console.error(`Status email failed for order ${id} (${order_status}):`, err))
     }
   }

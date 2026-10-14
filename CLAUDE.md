@@ -70,7 +70,7 @@ Three transactional emails, all built in `lib/email.ts`:
 |---|---|---|
 | Order placed | admin + customer | `sendOrderEmails()` |
 | Status → `shipped` | customer | `sendOrderStatusEmail()` |
-| Status → `delivered` | customer | `sendOrderStatusEmail()` |
+| Status → `delivered` | customer, with the review link | `sendOrderStatusEmail()` |
 | Status → `cancelled` | customer | `sendOrderStatusEmail()` |
 
 `approved` deliberately sends nothing — see the comment on
@@ -205,7 +205,7 @@ permanently. Unset optional values render nothing rather than an empty row.
 Both pages are statically prerendered, so a change needs a redeploy.
 
 ⚠️ **The privacy policy describes what the code actually does** — the
-collection list mirrors the `orders` and `chat_*` tables, and the processor list
+collection list mirrors the `orders`, `reviews` and `chat_*` tables, and the processor list
 is every external host the app talks to. Add a processor or a column and that
 page is wrong until it is updated.
 
@@ -317,6 +317,53 @@ pages with nothing to rank, and a checkout form has no business in an index.
 ⚠️ **Product pages state only what the code knows** — price and shots from
 `lib/products.ts`, delivery area from `lib/phLocations.ts`, freshness from
 `lib/freshness.ts`.
+
+## Customer reviews (#37)
+⚠️ **Never seed, write or invent a review** — not in a migration, a seed
+script, an e2e fixture or an admin button. Fabricated reviews on a food
+product are a trust problem and, under PH consumer-protection rules, a legal
+one. No reviews means no section and no rating markup, and that is correct.
+`tests/reviews.test.ts` fails on any `INSERT INTO reviews` outside
+`submitReview()`, and on any UPDATE that touches a review's words, rating or
+name.
+
+| Piece | File |
+|---|---|
+| Rules, tokens, JSON-LD (pure) | `lib/reviews.ts` |
+| Storage, cached product read | `lib/reviewStore.ts` (migration 0009) |
+| Customer form | `app/(storefront)/review/` |
+| Public API | `app/api/reviews/` — submit, and `request/` to look a token up |
+| Moderation | `/admin/reviews`, `app/api/admin/reviews/` |
+
+**One review per delivered order**, pinned to the bottles that order contained
+(`product_ids`, snapshotted at submission). It shows on each of those product
+pages.
+
+**The link carries a token, never an order number.** `orders.id` is a SERIAL.
+Marking an order `delivered` mints 256 random bits; only the SHA-256 is stored
+in `review_requests`, and the delivered email gets the raw token. It is
+minted **once**: a repeat delivered transition sends no invitation and the
+first link keeps working. Don't make it rotate — the repeat email shares the
+Resend idempotency key and is dropped, which would leave the customer holding
+only a dead link. The INSERT re-checks that the order is *still* delivered.
+
+**The token rides in the URL fragment** (`/review#<token>`), so it never
+reaches Vercel's logs or a Referer. The page reads it, strips it from the
+address bar before any analytics tag loads, and POSTs it. A reload loses it on
+purpose.
+
+**Moderation is publish or reject, nothing else.** No edit, no "add". The admin
+page states the rule: reject for personal details, abuse, spam or off-topic,
+never for a low rating.
+
+**Product pages stay static.** `lib/db.ts` sets `cache: 'no-store'`, which
+Next 14 treats as dynamic even inside `unstable_cache`. So the product read
+uses its own client without it, cached under the `reviews` tag. Moderation
+revalidates the tag and the affected `/shop/<id>` pages. Any `DATABASE_URL`
+problem renders no section rather than failing the build.
+
+**JSON-LD goes through `jsonLd()`** (`lib/seo.ts`), which escapes `<`. A
+review is visitor text, and plain `JSON.stringify` lets `</script>` out.
 
 ## About page & social links
 `/about` (`app/(storefront)/about/`) states only what a module owns — the

@@ -58,3 +58,15 @@ export function pageMeta({ title, description, path, noindex }: PageMetaInput): 
     },
   }
 }
+
+/**
+ * JSON for a `<script type="application/ld+json">`.
+ *
+ * Plain JSON.stringify is not safe there once any value came from a visitor:
+ * a review reading `</script><script>…` closes the tag and runs. `<` escaped
+ * as `<` is still the same string to any JSON parser and can never end
+ * the element.
+ */
+export function jsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c')
+}

@@ -473,6 +473,12 @@ export interface OrderStatusEmailData {
   paymentMethod?: string
   /** 'paid' suppresses the payment reminder; anything else keeps it. */
   paymentStatus?: string
+  /**
+   * The review link (issue #37), on the first delivered email only. Absent —
+   * a repeat delivered transition, or the token couldn't be issued — and the
+   * email goes out without the invitation rather than not at all.
+   */
+  reviewUrl?: string | null
 }
 
 /**
@@ -526,7 +532,23 @@ const STATUS_COPY: Record<NotifiedOrderStatus, { subject: (id: number) => string
   },
 }
 
-export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
+/**
+ * The review invitation on the delivered email. It asks, and says plainly
+ * that a person reads every review before it appears — nothing is promised
+ * in exchange, because a review paid for with a discount is not a review.
+ */
+function reviewInvite(url: string): string {
+  return infoBox(
+    '#FAF6F1',
+    '#F0E2D0',
+    `<p style="margin:0 0 4px;font-family:${FONT};font-weight:600;color:#1C0A00;">☕ How was it?</p>
+     <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">Once you have tried it, tell other customers what you thought — good or bad. It takes a minute, and we read every review before it goes on the site.</p>
+     ${button(url, 'Review your order →')}`
+  )
+}
+
+/** Builds the status email without sending it — what the tests look at. */
+export function buildOrderStatusEmail(data: OrderStatusEmailData): OutboundMessage {
   const { orderId, status, customer, total, deliverySlots, paymentStatus } = data
   const paymentMethod = data.paymentMethod ?? DEFAULT_PAYMENT_METHOD
   const copy = STATUS_COPY[status]
@@ -569,7 +591,7 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
              <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">₱${total.toLocaleString()} received — nothing to prepare.</p>`
           )
 
-  await deliver({
+  return {
     to: customer.email,
     bcc: staffBcc(),
     // One notification per order per status, however many times the admin
@@ -599,9 +621,15 @@ export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
 
       ${paymentSection}
 
+      ${status === 'delivered' && data.reviewUrl ? reviewInvite(data.reviewUrl) : ''}
+
       ${status === 'cancelled' ? '' : `<p style="margin:0;font-family:${FONT};color:#8B5E0A;font-size:13px;">Something wrong with this order? Just reply to this email.</p>`}
     `),
-  })
+  }
+}
+
+export async function sendOrderStatusEmail(data: OrderStatusEmailData) {
+  await deliver(buildOrderStatusEmail(data))
 }
 
 /**
