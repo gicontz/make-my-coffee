@@ -32,7 +32,7 @@ export const MIN_LEAD_DAYS = 1
 export const MAX_DAYS_AHEAD = 30
 
 /** Plain calendar arithmetic — UTC internally so no zone can shift the day. */
-function addDays(iso: string, days: number): string {
+export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const t = new Date(Date.UTC(y, m - 1, d) + days * 86_400_000)
   const pad = (n: number) => String(n).padStart(2, '0')

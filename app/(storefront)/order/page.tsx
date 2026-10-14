@@ -276,6 +276,19 @@ export default function OrderPage() {
       return
     }
 
+    // The order posts `voucher?.code` and nothing else, so submitting while a
+    // check is still in flight — or with a code typed but never applied —
+    // places the order at full price beside a total the customer expected to
+    // be discounted. That used to be an accepted race; welcome codes arriving
+    // by email (#39) make paste-then-Place-Order the common path, so the
+    // summary has to be showing the discount before an order can go through.
+    if (checkingVoucher) return
+    if (!voucher && voucherInput.trim()) {
+      setVoucherError('Tap Apply to use this code, or clear the field to order without one.')
+      setError('Apply your voucher code — or clear it — before placing your order.')
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch('/api/orders', {
@@ -842,7 +855,7 @@ export default function OrderPage() {
 
                 <button
                   type="submit"
-                  disabled={loading || quoting}
+                  disabled={loading || quoting || checkingVoucher}
                   className="w-full flex items-center justify-center gap-2 bg-espresso-900 hover:bg-espresso-700 disabled:opacity-60 text-espresso-50 font-bold py-4 rounded-full transition-colors shadow-lg text-base"
                 >
                   {loading ? (
