@@ -4,6 +4,7 @@ import { products } from '@/lib/products'
 import { recipes, recipeSummary } from '@/lib/recipes'
 import { RECIPE_IMAGES } from './recipes/images'
 import HeroSection from '@/components/HeroSection'
+import EmailSignup from '@/components/EmailSignup'
 import { productImage, productImageAlt } from '@/app/(storefront)/shop/images'
 import aconchegoBeans from '@/app/assets/aconchengo.jpg'
 
@@ -275,6 +276,13 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── EMAIL SIGNUP ── */}
+      <section className="py-20 bg-espresso-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <EmailSignup source="home" />
         </div>
       </section>
 
