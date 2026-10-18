@@ -349,6 +349,58 @@ then rejects.
   it, rather than each keeping a copy of the same `Intl` call.
 
 ---
+## D15 — Weekly subscriptions: schedule and controls first, billing undecided
+**Decision:** #38's weekly subscription at 10% off is built *except* for how it
+is paid for and how a customer signs up. What exists: the weekly schedule, the
+price, the customer's own pause/skip/resume/cancel page, the manage link, and a
+weekly subscription-share report on the admin dashboard. Nothing creates a
+`subscriptions` row.
+**Why:** There is no way to charge anyone weekly yet. #21 (PayMongo) isn't
+built, and even with it, whether GCash and Maya can be charged on a schedule is
+unconfirmed: PayMongo's marketing says its Subscriptions product covers cards,
+GCash and Maya, while its developer docs describe charging cards only, after
+an account eligibility review. #38 says outright that a subscription collected
+by COD or by re-scanning a QR every week is worse than shipping none. So
+everything that is true whichever way billing goes is built now, and the
+part that depends on the answer waits for it.
+**Implications:**
+- **Sign-up and billing ship together, or not at all.** `tests/subscriptions.test.ts`
+  fails on any `INSERT INTO subscriptions`; delete that test in the change that
+  adds billing, not before.
+- The schema has **no payment columns** (migration 0013). If PayMongo's
+  subscription product ends up owning the weekly cycle, pause/skip/cancel will
+  have to call it too — check that before wiring billing to the existing
+  controls.
+- Every delivery date comes from `nextOnCadence()`, which only returns dates
+  `validateDeliveryDate()` accepts at that moment — tomorrow at the earliest,
+  Manila time — and keeps the weekday fixed. A stored date that has slipped
+  into the past (a pause, a missed order run) rolls forward whole weeks, never
+  to "whatever is soonest".
+- Skips stack only within the 30-day booking window; beyond that the page says
+  to pause instead.
+- 10% comes off the **bottles only**, floored. Delivery is quoted per order
+  from the pin as usual, and the free-delivery threshold is judged *before*
+  the discount — same rule as a voucher. Subscription orders take no voucher.
+- Items are stored as ids and quantities and priced from `lib/products.ts` at
+  each delivery (D8, D12). A price change therefore reaches existing
+  subscribers on their next delivery — tell them before changing a price.
+- **The manage link is derived, not random**: `HMAC(SUBSCRIPTION_LINK_SECRET,
+  id + version)`, so every weekly email can carry the same link. Only its
+  SHA-256 is stored, it rides in the URL fragment like the review link, and
+  bumping `manage_token_version` revokes a leaked one. The page it opens shows
+  first name, bottles, dates and the bottle price — never an address, phone or
+  email, because these links live in emails and emails get forwarded.
+- Changes are written with the old status *and* date in the `WHERE`, so a
+  customer's skip can't race the order run into delivering a week off.
+- `orders.subscription_id` is what the weekly share report counts. A unique
+  index on `(subscription_id, delivery_date)` makes it impossible for a
+  retried order run to create — or charge — the same week twice.
+- Still to build once billing is decided: sign-up at checkout, the order run
+  (a scheduled job that turns `next_delivery_date` into an order the day
+  before and advances it a week), the manage link in every subscription email,
+  and the `/privacy` rows for the new table.
+
+---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.
 - Default admin credentials and dev `SESSION_SECRET` fallback must not ship to prod.

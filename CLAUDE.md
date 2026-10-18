@@ -449,6 +449,30 @@ with every event. Verified on the wire for both pixels on 2026-10-11.
 - **TikTok has no verified code switch.** Automatic Advanced Matching must be
   off in TikTok Events Manager → pixel → Settings, or `/privacy` is wrong.
 
+## Weekly subscriptions (#38) — not offered yet, on purpose
+The schedule, the 10% price, the customer's manage page and the weekly share
+report exist; **sign-up and billing don't**, and nothing creates a
+`subscriptions` row. Billing is undecided — see `memory/decision.md` D15 before
+touching any of it. `tests/subscriptions.test.ts` fails on any
+`INSERT INTO subscriptions` until the change that adds billing removes it.
+
+| Piece | File |
+|---|---|
+| Schedule, price, pause/skip/resume/cancel rules (pure) | `lib/subscriptions.ts` |
+| Reads, writes, manage token | `lib/subscriptionStore.ts` |
+| Bearer-link helpers (hash, HMAC-derived token) | `lib/linkToken.ts` |
+| Customer manage page | `app/(storefront)/subscription/` (noindex, token in the fragment) |
+| Its endpoint | `app/api/subscriptions/manage/route.ts` |
+| Weekly share report | `getSubscriptionStats()` in `lib/stats.ts`, on `/admin/dashboard` |
+| Schema | migration 0013 — `subscriptions`, `orders.subscription_id` |
+
+**Every subscription date goes through `nextOnCadence()`**, which only returns
+dates `validateDeliveryDate()` accepts. Don't compute one with `addDays` alone.
+
+The manage link is HMAC-derived from `SUBSCRIPTION_LINK_SECRET` so it can be
+re-sent weekly; the view behind it never selects an address, phone or email,
+and a test pins that.
+
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side
 - Cart persists to `localStorage` under key `mmc-cart`

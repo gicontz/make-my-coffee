@@ -94,3 +94,44 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 
 UPDATE orders SET paid_at = created_at WHERE payment_status = 'paid' AND paid_at IS NULL;
+
+-- ── Subscriptions (0013) — see memory/decision.md D15 ──
+-- Same statements as lib/migrations/0013_add_subscriptions.sql, which carries
+-- the reasoning. Nothing creates a subscription yet: billing comes first.
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                   SERIAL PRIMARY KEY,
+  first_name           TEXT NOT NULL,
+  last_name            TEXT NOT NULL,
+  email                TEXT NOT NULL,
+  phone                TEXT NOT NULL DEFAULT '',
+  address              TEXT NOT NULL DEFAULT '',
+  barangay             TEXT NOT NULL DEFAULT '',
+  city                 TEXT NOT NULL DEFAULT '',
+  province             TEXT NOT NULL DEFAULT '',
+  postal_code          TEXT NOT NULL DEFAULT '',
+  notes                TEXT NOT NULL DEFAULT '',
+  delivery_lat         NUMERIC,
+  delivery_lng         NUMERIC,
+  items                JSONB NOT NULL,
+  delivery_slots       TEXT[] NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'active',
+  next_delivery_date   DATE NOT NULL,
+  manage_token_version INTEGER NOT NULL DEFAULT 1,
+  manage_token_hash    TEXT NOT NULL UNIQUE,
+  paused_at            TIMESTAMPTZ,
+  cancelled_at         TIMESTAMPTZ,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT subscriptions_status_chk CHECK (status IN ('active', 'paused', 'cancelled'))
+);
+
+CREATE INDEX IF NOT EXISTS subscriptions_due_idx
+  ON subscriptions (next_delivery_date) WHERE status = 'active';
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_subscription_delivery_idx
+  ON orders (subscription_id, delivery_date) WHERE subscription_id IS NOT NULL;
