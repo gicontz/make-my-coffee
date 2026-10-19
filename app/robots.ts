@@ -11,7 +11,7 @@ import { siteUrl } from '@/lib/siteUrl'
  */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: '*', allow: '/', disallow: ['/admin', '/api/', '/cart', '/order', '/subscription', '/unsubscribe'] }],
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/admin', '/api/', '/cart', '/order', '/review', '/subscription', '/unsubscribe'] }],
     sitemap: `${siteUrl()}/sitemap.xml`,
   }
 }

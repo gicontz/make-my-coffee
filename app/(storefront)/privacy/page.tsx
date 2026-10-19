@@ -25,7 +25,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /**
  * Written to match what the code actually does, not from a template — the
- * collection list mirrors the `orders`, `chat_*` and `email_subscribers`
+ * collection list mirrors the `orders`, `reviews`, `chat_*` and `email_subscribers`
  * tables, and the processor list is every external host the app talks to. If either changes, this page
  * is wrong until it is updated.
  */
@@ -62,6 +62,12 @@ export default function PrivacyPage() {
           <p><strong className="text-espresso-800">When you sign up for emails:</strong> your email address, when
           you signed up and from which form, the exact wording you agreed to, the ₱{WELCOME_DISCOUNT} code we
           issued you, and when we sent it. If you unsubscribe, we record when.</p>
+
+          <p><strong className="text-espresso-800">When you review an order:</strong> your star rating, what you
+          wrote, the name you chose to show with it, and which order it was for. We read every review before it is
+          published; once published, the rating, the text and that name are public on our product pages — your
+          email, address and order details never are. The review link in your delivery email works only for your
+          order.</p>
 
           <p><strong className="text-espresso-800">When you use the chat:</strong> the messages you send, and a
           random identifier stored in a cookie so the conversation is still there if you reload the page. That
@@ -112,7 +118,8 @@ export default function PrivacyPage() {
 
         <Section title="Why we hold it">
           <p>To take, price, deliver and confirm your order; to send you order confirmations and delivery updates;
-          to answer your questions; to prevent voucher abuse; to keep ordinary business records of sales; and, only
+          to answer your questions; to prevent voucher abuse; to publish the reviews customers choose to write; to keep ordinary business
+          records of sales; and, only
           if you signed up for it, to send the marketing email described below.</p>
         </Section>
 
@@ -187,9 +194,10 @@ export default function PrivacyPage() {
 
         <Section title="How long we keep it">
           <p>Order records are kept as long as we need them for business and tax records. Chat conversations are kept
-          so we can follow up on what you asked. Your email signup is kept until you ask us to delete it;
-          unsubscribing marks it as unsubscribed, as described above. Ask us to delete any of these and we will,
-          except where we are required to keep a record of a completed sale.</p>
+          so we can follow up on what you asked. Reviews are kept while they are useful to other customers. Your
+          email signup is kept until you ask us to delete it; unsubscribing marks it as unsubscribed, as described
+          above. Ask us to delete any of these and we will, except where we are required to keep a record of a
+          completed sale.</p>
         </Section>
 
         <Section title="Your rights">

@@ -121,6 +121,32 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS orders_email_key_idx ON orders (lower(trim(email)));
 
+-- ── Reviews (0010) — issue #37 ──
+-- Here as well as in the migration because the delivered transition now
+-- issues a review token, and e2e applies this file rather than migrations.
+-- No INSERT, ever: see the hard rule at the top of lib/reviews.ts.
+
+CREATE TABLE IF NOT EXISTS review_requests (
+  order_id    INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+  token_hash  TEXT NOT NULL UNIQUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id            SERIAL PRIMARY KEY,
+  order_id      INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+  rating        SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  body          TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 1000),
+  display_name  TEXT NOT NULL CHECK (char_length(display_name) BETWEEN 1 AND 40),
+  product_ids   TEXT[] NOT NULL,
+  approved      BOOLEAN NOT NULL DEFAULT FALSE,
+  moderated_at  TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS reviews_moderation_idx ON reviews (moderated_at NULLS FIRST, created_at DESC);
+CREATE INDEX IF NOT EXISTS reviews_product_ids_idx ON reviews USING GIN (product_ids) WHERE approved;
+
 -- ── Subscriptions (0013) — see memory/decision.md D16 ──
 -- Same statements as lib/migrations/0013_add_subscriptions.sql, which carries
 -- the reasoning. Nothing creates a subscription yet: billing comes first.

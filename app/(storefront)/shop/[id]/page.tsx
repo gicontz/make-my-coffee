@@ -6,9 +6,12 @@ import SizeComparison from '@/components/SizeComparison'
 import { pricePerShot, productById, products } from '@/lib/products'
 import { PROVINCES } from '@/lib/phLocations'
 import { FREE_SHIPPING_MIN_SUBTOTAL } from '@/lib/shipping'
-import { BLEND_ORIGIN, pageMeta } from '@/lib/seo'
+import { BLEND_ORIGIN, jsonLd, pageMeta } from '@/lib/seo'
 import { FRESHNESS_SUMMARY, RETURNS } from '@/lib/freshness'
 import { siteUrl } from '@/lib/siteUrl'
+import { productReviewLd, reviewMonth } from '@/lib/reviews'
+import { approvedReviewsFor } from '@/lib/reviewStore'
+import StarRating from '@/components/StarRating'
 import AddToCart from './AddToCart'
 
 const serif = { fontFamily: 'var(--font-playfair), Georgia, serif' }
@@ -17,6 +20,12 @@ const serif = { fontFamily: 'var(--font-playfair), Georgia, serif' }
 export function generateStaticParams() {
   return products.map(p => ({ id: p.id }))
 }
+
+// Static, but with approved reviews on them: approving or rejecting one
+// revalidates these pages straight away (app/api/admin/reviews/[id]). The
+// hour is only a backstop — e.g. for a build that ran while the database was
+// unreachable and so rendered no reviews.
+export const revalidate = 3600
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   const product = productById(params.id)
@@ -46,9 +55,14 @@ export function generateMetadata({ params }: { params: { id: string } }) {
  * 7-day window only refrigerated, so quoting half of either would publish a
  * claim the business cannot stand behind.
  */
-export default function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({ params }: { params: { id: string } }) {
   const product = productById(params.id)
   if (!product) notFound()
+
+  // Approved reviews from delivered orders that contained this bottle. None —
+  // the usual case at first — renders no section and no rating markup at
+  // all. Never fill the gap: see the hard rule in lib/reviews.ts.
+  const { summary, shown } = await approvedReviewsFor(product.id)
 
   const perDrink = pricePerShot(product)
   const others = products.filter(p => p.id !== product.id)
@@ -71,13 +85,15 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       availability: 'https://schema.org/InStock',
       seller: { '@type': 'Organization', name: 'Make My Coffee' },
     },
+    // Adds no keys at all when there are no reviews.
+    ...productReviewLd(summary, shown),
   }
 
   return (
     <div className="min-h-screen bg-espresso-50">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLd(productLd) }}
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -158,6 +174,40 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </dl>
           </div>
         </div>
+
+        {summary && shown.length > 0 && (
+          <section className="mt-16" aria-labelledby="reviews-heading">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 mb-6">
+              <h2 id="reviews-heading" className="text-espresso-900 text-2xl font-bold" style={serif}>
+                What customers say
+              </h2>
+              <p className="flex items-center gap-2 text-espresso-700 text-sm">
+                <StarRating rating={summary.average} />
+                <span>
+                  <strong className="text-espresso-900">{summary.average.toFixed(1)}</strong> out of 5 ·{' '}
+                  {summary.count} {summary.count === 1 ? 'review' : 'reviews'}
+                </span>
+              </p>
+            </div>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {shown.map(review => (
+                <li key={review.id} className="bg-white rounded-2xl border border-espresso-100 p-6">
+                  <StarRating rating={review.rating} size={14} />
+                  {/* Plain text in a pre-line block: React escapes it, and the
+                      customer's own line breaks survive. */}
+                  <p className="text-espresso-700 text-sm leading-relaxed mt-3 whitespace-pre-line break-words">{review.body}</p>
+                  <p className="text-espresso-500 text-xs mt-4">
+                    <span className="text-espresso-800 font-semibold">{review.display_name}</span>
+                    {' · '}Verified order · {reviewMonth(review.created_at)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {summary.count > shown.length && (
+              <p className="text-espresso-500 text-xs mt-4">Showing the {shown.length} most recent.</p>
+            )}
+          </section>
+        )}
 
         <div className="mt-16 bg-white rounded-2xl border border-espresso-100 px-6 py-8">
           <h2 className="text-espresso-900 text-2xl font-bold mb-6 text-center" style={serif}>How the sizes compare</h2>
