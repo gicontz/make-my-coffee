@@ -11,7 +11,9 @@ export async function GET() {
   }
 
   try {
-    const rows = await sql`SELECT * FROM vouchers ORDER BY created_at DESC`
+    // Welcome codes (#39) are one row per email signup — they'd bury the codes
+    // a person made. Their totals are on GET /api/admin/subscribers instead.
+    const rows = await sql`SELECT * FROM vouchers WHERE kind <> 'welcome' ORDER BY created_at DESC`
     return NextResponse.json(rows)
   } catch (err) {
     console.error('GET /api/admin/vouchers error:', err)

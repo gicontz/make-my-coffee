@@ -7,7 +7,7 @@
 // `node --experimental-strip-types`.
 //
 // ⚠️ PAYMENT IS NOT BUILT, AND SIGN-UP IS NOT OFFERED, ON PURPOSE.
-// There is no way to charge a customer weekly yet (decision.md D15): no
+// There is no way to charge a customer weekly yet (decision.md D16): no
 // gateway (#21), and whether PayMongo can charge GCash/Maya on a schedule —
 // rather than cards only — is unconfirmed. A subscription collected by COD or
 // a weekly QR re-scan is worse than none (the issue says so outright). So this

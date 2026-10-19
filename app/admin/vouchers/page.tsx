@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { FREE_SHIPPING_VOUCHER_CAP, voucherLabel, type DiscountType, type Voucher } from '@/lib/vouchers'
+import type { SubscriberSummary } from '@/lib/subscribe'
 
 /* ── Manila time ─────────────────────────────────────────────────────────
    <input type="datetime-local"> has no timezone — the browser reads and
@@ -134,6 +135,16 @@ export default function AdminVouchers() {
 
   useEffect(() => { fetchVouchers() }, [fetchVouchers])
 
+  // Welcome codes (#39) are kept out of the list above — one per signup — so
+  // their totals live here. Best-effort: a failure hides the strip, nothing more.
+  const [signups, setSignups] = useState<SubscriberSummary | null>(null)
+  useEffect(() => {
+    fetch('/api/admin/subscribers')
+      .then(res => (res.ok ? res.json() : null))
+      .then(setSignups)
+      .catch(() => setSignups(null))
+  }, [])
+
   function openCreate() {
     setEditing(null)
     setForm(EMPTY_FORM)
@@ -234,6 +245,15 @@ export default function AdminVouchers() {
           New Voucher
         </button>
       </div>
+
+      {signups && (
+        <p className="text-espresso-500 text-xs mb-6 bg-white border border-espresso-100 rounded-xl px-4 py-3">
+          <span className="font-semibold text-espresso-700">Email signups:</span>{' '}
+          {signups.subscribed} subscribed · {signups.unsubscribed} unsubscribed · welcome codes{' '}
+          {signups.welcomeRedeemed} of {signups.welcomeIssued} redeemed · {signups.remindersSent} running-low
+          reminders sent
+        </p>
+      )}
 
       {loading ? (
         <div className="text-center py-20 text-espresso-400">Loading vouchers…</div>

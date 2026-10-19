@@ -1,4 +1,4 @@
--- Weekly subscriptions at 10% off (#38). See memory/decision.md D15 and
+-- Weekly subscriptions at 10% off (#38). See memory/decision.md D16 and
 -- lib/subscriptions.ts.
 --
 -- Numbered 0013, after PayMongo's 0012 (#21): subscriptions can't be offered
@@ -7,7 +7,7 @@
 --
 -- ⚠️ No payment columns, on purpose. How a subscription is charged — a
 -- PayMongo card subscription, a stored payment method, something else — is
--- not decided (D15), and whichever it is will bring its own columns in its own
+-- not decided (D16), and whichever it is will bring its own columns in its own
 -- migration. Nothing creates a row here until then.
 --
 -- Additive only, so a code rollback across this migration stays safe (issue #9).

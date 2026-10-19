@@ -2,7 +2,7 @@
 // lib/migrations/0013; the pure rules are lib/subscriptions.ts.
 //
 // ⚠️ Nothing here creates a subscription. Sign-up waits on billing — see the
-// header of lib/subscriptions.ts and decision.md D15.
+// header of lib/subscriptions.ts and decision.md D16.
 
 import { sql } from '@/lib/db'
 import { slotLabel } from '@/lib/deliverySlots'

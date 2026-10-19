@@ -208,7 +208,7 @@ test('statuses match the CHECK constraint in migration 0013', () => {
   assert.deepEqual(inSql, [...SUBSCRIPTION_STATUSES])
 })
 
-test('nothing creates a subscription until billing exists (D15)', () => {
+test('nothing creates a subscription until billing exists (D16)', () => {
   // Remove this test in the change that adds sign-up *and* the billing for it
   // — not before. A subscription with no way to charge it is the thing #38
   // says is worse than not shipping one.

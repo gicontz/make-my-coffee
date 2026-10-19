@@ -95,7 +95,33 @@ ALTER TABLE orders
 
 UPDATE orders SET paid_at = created_at WHERE payment_status = 'paid' AND paid_at IS NULL;
 
--- ── Subscriptions (0013) — see memory/decision.md D15 ──
+-- ── Email signups (0009) — see memory/decision.md D15 ──
+
+ALTER TABLE vouchers
+  ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'manual'
+    CONSTRAINT vouchers_kind_chk CHECK (kind IN ('manual', 'welcome'));
+
+CREATE TABLE IF NOT EXISTS email_subscribers (
+  id                SERIAL PRIMARY KEY,
+  email             TEXT NOT NULL,
+  email_key         TEXT NOT NULL UNIQUE,
+  source            TEXT NOT NULL DEFAULT '',
+  consent_text      TEXT NOT NULL,
+  subscribed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  unsubscribed_at   TIMESTAMPTZ,
+  unsubscribe_token TEXT NOT NULL UNIQUE,
+  voucher_id        INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+  welcome_sent_at   TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS email_subscribers_created_at_idx ON email_subscribers (created_at);
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS orders_email_key_idx ON orders (lower(trim(email)));
+
+-- ── Subscriptions (0013) — see memory/decision.md D16 ──
 -- Same statements as lib/migrations/0013_add_subscriptions.sql, which carries
 -- the reasoning. Nothing creates a subscription yet: billing comes first.
 
