@@ -121,7 +121,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS orders_email_key_idx ON orders (lower(trim(email)));
 
--- ── Subscriptions (0013) — see memory/decision.md D15 ──
+-- ── Subscriptions (0013) — see memory/decision.md D16 ──
 -- Same statements as lib/migrations/0013_add_subscriptions.sql, which carries
 -- the reasoning. Nothing creates a subscription yet: billing comes first.
 

@@ -507,7 +507,7 @@ with every event. Verified on the wire for both pixels on 2026-10-11.
 ## Weekly subscriptions (#38) — not offered yet, on purpose
 The schedule, the 10% price, the customer's manage page and the weekly share
 report exist; **sign-up and billing don't**, and nothing creates a
-`subscriptions` row. Billing is undecided — see `memory/decision.md` D15 before
+`subscriptions` row. Billing is undecided — see `memory/decision.md` D16 before
 touching any of it. `tests/subscriptions.test.ts` fails on any
 `INSERT INTO subscriptions` until the change that adds billing removes it.
 

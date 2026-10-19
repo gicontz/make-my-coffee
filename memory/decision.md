@@ -409,7 +409,7 @@ everything the reminder needs (shots in the JSONB snapshot,
   refused while a typed code is unapplied.
 
 ---
-## D15 — Weekly subscriptions: schedule and controls first, billing undecided
+## D16 — Weekly subscriptions: schedule and controls first, billing undecided
 **Decision:** #38's weekly subscription at 10% off is built *except* for how it
 is paid for and how a customer signs up. What exists: the weekly schedule, the
 price, the customer's own pause/skip/resume/cancel page, the manage link, and a
