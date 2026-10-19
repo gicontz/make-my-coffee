@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import SalesChart from '@/components/admin/SalesChart'
-import { getDashboardStats } from '@/lib/stats'
+import { formatDeliveryDate } from '@/lib/deliveryDate'
+import { getDashboardStats, getSubscriptionStats } from '@/lib/stats'
 
 // Must be live on every request — never build-time prerendered. Without this,
 // Next statically renders the dashboard once at build time (stale numbers
@@ -25,10 +26,18 @@ export default async function Dashboard() {
   // Direct DB call — no self-fetch over HTTP. (The dashboard previously
   // fetched its own /api/admin/stats route via a hardcoded localhost URL,
   // which never resolved correctly in dev or prod; see lib/stats.ts.)
-  const stats = await getDashboardStats().catch(err => {
-    console.error('getDashboardStats failed:', err)
-    return null
-  })
+  // Fetched separately, and failing separately: a database without migration
+  // 0013 loses the subscriptions panel, not the dashboard.
+  const [stats, subs] = await Promise.all([
+    getDashboardStats().catch(err => {
+      console.error('getDashboardStats failed:', err)
+      return null
+    }),
+    getSubscriptionStats().catch(err => {
+      console.error('getSubscriptionStats failed:', err)
+      return null
+    }),
+  ])
 
   // Revenue cards show COLLECTED money only — paid, non-cancelled orders (see
   // lib/stats.ts). Everything else that was ordered but not yet paid for is
@@ -67,6 +76,8 @@ export default async function Dashboard() {
         : null,
     },
   ]
+
+  const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : '—')
 
   const breakdownMap = new Map((stats?.statusBreakdown ?? []).map(s => [s.order_status, s.count]))
 
@@ -136,6 +147,50 @@ export default async function Dashboard() {
         <p className="text-espresso-400 text-xs mt-1 mb-6">Manila days. Revenue counts paid, non-cancelled orders; uncollected is ordered but not yet paid.</p>
         {stats?.daily ? <SalesChart data={stats.daily} /> : (
           <p className="text-espresso-400 text-sm text-center py-16">No data yet — connect the database to see charts.</p>
+        )}
+      </div>
+
+      {/* Subscription share — the marketing plan's weekly KPI (#38). */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-espresso-100 mb-8">
+        <h2 className="text-espresso-900 font-bold" style={{ fontFamily: 'Georgia, serif' }}>Subscription Share</h2>
+        <p className="text-espresso-400 text-xs mt-1 mb-4">
+          Manila weeks, Monday start. Orders placed that week, cancelled ones excluded.
+        </p>
+        {subs ? (
+          <>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {([['Active', subs.active], ['Paused', subs.paused], ['Cancelled', subs.cancelled]] as const).map(([label, n]) => (
+                <span key={label} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-espresso-100 text-espresso-700">
+                  {label} subscriptions <span className="font-mono">{n}</span>
+                </span>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-espresso-50">
+                  <tr>
+                    {['Week of', 'Orders', 'From a subscription', 'Share'].map(h => (
+                      <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-espresso-500 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-espresso-50">
+                  {subs.weeks.map(w => (
+                    <tr key={w.weekStart}>
+                      <td className="px-4 py-2 text-espresso-700">{formatDeliveryDate(w.weekStart)}</td>
+                      <td className="px-4 py-2 font-mono text-espresso-900">{w.orders}</td>
+                      <td className="px-4 py-2 font-mono text-espresso-900">{w.subscriptionOrders}</td>
+                      <td className="px-4 py-2 font-semibold text-espresso-900">{pct(w.subscriptionOrders, w.orders)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="text-espresso-400 text-sm">
+            Couldn't load subscription figures — has migration 0013 been applied to this database?
+          </p>
         )}
       </div>
 
