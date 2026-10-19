@@ -25,6 +25,8 @@ export interface Voucher {
   starts_at: string | null
   expires_at: string | null
   is_active: boolean
+  /** 'welcome' = issued by the email signup (#39), one per subscriber. */
+  kind?: 'manual' | 'welcome'
   created_at: string
   updated_at: string
 }

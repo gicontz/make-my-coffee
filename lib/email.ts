@@ -10,6 +10,9 @@ import { FREE_SHIPPING_VOUCHER_CAP, type AppliedVoucher } from './vouchers.ts'
 // lives at a stable /qr/... path (not a hashed /_next/static one) precisely so
 // an email sent today still renders its image after the next deploy.
 import { siteUrl } from './siteUrl.ts'
+import { MADE_TO_ORDER } from './freshness.ts'
+import { earliestDeliveryDate } from './deliveryDate.ts'
+import { SIGNUP_CONSENT, WELCOME_DISCOUNT } from './subscribe.ts'
 
 interface OrderItem {
   id: string
@@ -87,6 +90,8 @@ export interface OutboundMessage {
    * re-delivered request can't mail the customer twice.
    */
   idempotencyKey?: string
+  /** Extra headers — List-Unsubscribe on marketing mail. */
+  headers?: Record<string, string>
 }
 
 function mailFrom(): string {
@@ -114,6 +119,7 @@ async function deliverViaResend(msg: OutboundMessage, apiKey: string): Promise<v
       ...(replyTo() ? { reply_to: replyTo() } : {}),
       subject: msg.subject,
       html: msg.html,
+      ...(msg.headers ? { headers: msg.headers } : {}),
     }),
   })
 
@@ -135,12 +141,13 @@ async function deliverViaGmail(msg: OutboundMessage, user: string, pass: string)
     ...(replyTo() ? { replyTo: replyTo() } : {}),
     subject: msg.subject,
     html: msg.html,
+    ...(msg.headers ? { headers: msg.headers } : {}),
   })
 }
 
 async function deliver(msg: OutboundMessage): Promise<void> {
   if (process.env.EMAIL_TRANSPORT === 'json') {
-    await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html })
+    await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html, headers: msg.headers })
     return
   }
 
@@ -163,7 +170,7 @@ async function deliver(msg: OutboundMessage): Promise<void> {
     )
     warnedNoCredentials = true
   }
-  await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html })
+  await mockTransport().sendMail({ from: mailFrom(), to: msg.to, subject: msg.subject, html: msg.html, headers: msg.headers })
 }
 
 // Staff copied on everything we send (comma-separated env).
@@ -649,4 +656,138 @@ export async function sendAdminNotice(subject: string, body: string) {
       <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:15px;white-space:pre-line;">${body}</p>
     `),
   })
+}
+
+// ── Marketing mail (#39) ──────────────────────────────────────────────────
+//
+// The welcome code and the running-low reminder. Unlike everything above,
+// these go only to people who signed up on the form (lib/subscribe.ts), and
+// each one carries its own way out:
+//
+//   - a visible unsubscribe link in the footer, to a page with one button;
+//   - List-Unsubscribe + List-Unsubscribe-Post (RFC 8058), so Gmail and Yahoo
+//     show their own one-click Unsubscribe. Both require it of bulk senders,
+//     and without it they file the mail as spam instead.
+//
+// No staff BCC here, deliberately. The footer link unsubscribes whoever's
+// token it carries, so a copy in a staff inbox is one stray click away from
+// silently unsubscribing the customer.
+
+/** Untrusted text into HTML. Names come from the checkout form. */
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+}
+
+export function unsubscribeLinks(token: string): { page: string; oneClick: string } {
+  const t = encodeURIComponent(token)
+  return {
+    // What a person clicks: a page with a button, not an action on GET. Mail
+    // scanners (Outlook Safe Links and friends) fetch every link in a message,
+    // and a GET that unsubscribed would take people off the list who never
+    // asked to leave.
+    page: `${siteUrl()}/unsubscribe?token=${t}`,
+    // What the mailbox provider POSTs to. RFC 8058 requires a POST with no
+    // further interaction, which is exactly what scanners never send.
+    oneClick: `${siteUrl()}/api/unsubscribe?token=${t}`,
+  }
+}
+
+function marketingHeaders(token: string): Record<string, string> {
+  return {
+    'List-Unsubscribe': `<${unsubscribeLinks(token).oneClick}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  }
+}
+
+function marketingFooter(token: string): string {
+  return `
+    <p style="margin:32px 0 0;padding-top:16px;border-top:1px solid #F5E6D3;font-family:${FONT};color:#8B5E0A;font-size:12px;line-height:1.6;">
+      You’re getting this because this address was signed up for emails at makemycoffee.cafe.
+      <a href="${unsubscribeLinks(token).page}" style="color:#C8860A;">Unsubscribe</a> — one click, and order emails are not affected.
+    </p>`
+}
+
+export interface WelcomeEmailData {
+  subscriberId: number
+  email: string
+  code: string
+  /** Last Manila calendar day the code works, YYYY-MM-DD. */
+  lastDay: string
+  unsubscribeToken: string
+}
+
+export function welcomeEmail(data: WelcomeEmailData): OutboundMessage {
+  const { subscriberId, email, code, lastDay, unsubscribeToken } = data
+  return {
+    to: email,
+    // One welcome per subscriber row, even if two signups race to send it.
+    idempotencyKey: `welcome-${subscriberId}`,
+    headers: marketingHeaders(unsubscribeToken),
+    subject: `Your ₱${WELCOME_DISCOUNT} off — Make My Coffee`,
+    html: base(`
+      <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">Welcome — here’s ₱${WELCOME_DISCOUNT} off</h2>
+      <p style="margin:0 0 24px;font-family:${FONT};color:#5C3317;font-size:15px;">Thanks for signing up. Enter this code at checkout:</p>
+
+      ${infoBox(
+        '#FFF8F0',
+        '#E8C9A0',
+        `<p style="margin:0 0 6px;font-family:'Courier New',Courier,monospace;font-size:26px;font-weight:700;letter-spacing:.08em;color:#1C0A00;text-align:center;">${esc(code)}</p>
+         <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:13px;text-align:center;">₱${WELCOME_DISCOUNT} off one order · good until ${formatDeliveryDate(lastDay)}</p>`
+      )}
+
+      <p style="margin:0 0 8px;font-family:${FONT};color:#5C3317;font-size:14px;">${esc(MADE_TO_ORDER)}</p>
+
+      ${button(`${siteUrl()}/shop`, 'Choose a bottle →')}
+
+      <p style="margin:24px 0 0;font-family:${FONT};color:#5C3317;font-size:13px;">What you signed up for: ${esc(SIGNUP_CONSENT)}</p>
+      <p style="margin:8px 0 0;font-family:${FONT};color:#5C3317;font-size:13px;">Didn’t sign up? Someone may have typed your address by mistake — unsubscribe below and you won’t hear from us again.</p>
+
+      ${marketingFooter(unsubscribeToken)}
+    `),
+  }
+}
+
+export async function sendWelcomeEmail(data: WelcomeEmailData) {
+  await deliver(welcomeEmail(data))
+}
+
+export interface RunningLowEmailData {
+  orderId: number
+  firstName: string
+  email: string
+  shots: number
+  /** The day the order arrived, YYYY-MM-DD. */
+  deliveryDate: string
+  unsubscribeToken: string
+  /** Injectable so the test can pin "tomorrow". */
+  now?: Date
+}
+
+export function runningLowEmail(data: RunningLowEmailData): OutboundMessage {
+  const { orderId, firstName, email, shots, deliveryDate, unsubscribeToken } = data
+  const name = firstName.trim() ? `, ${esc(firstName.trim())}` : ''
+  // Facts only: what arrived and when. Whether it has actually run out is the
+  // customer's to know — the copy asks rather than tells.
+  return {
+    to: email,
+    idempotencyKey: `running-low-${orderId}`,
+    headers: marketingHeaders(unsubscribeToken),
+    subject: 'Running low on Aconchego? — Make My Coffee',
+    html: base(`
+      <h2 style="margin:0 0 4px;font-family:${FONT};color:#1C0A00;font-size:22px;">Running low${name}?</h2>
+      <p style="margin:0 0 24px;font-family:${FONT};color:#8B5E0A;font-size:14px;">From order #${orderId}</p>
+
+      <p style="margin:0 0 16px;font-family:${FONT};color:#5C3317;font-size:15px;">Your ${shots} shot${shots === 1 ? '' : 's'} of Aconchego arrived on <strong>${formatDeliveryDate(deliveryDate)}</strong>. If the bottle is nearly done, order today and the next one can reach you as soon as <strong>${formatDeliveryDate(earliestDeliveryDate(data.now))}</strong>.</p>
+
+      <p style="margin:0;font-family:${FONT};color:#5C3317;font-size:14px;">${esc(MADE_TO_ORDER)}</p>
+
+      ${button(`${siteUrl()}/shop`, 'Order again →')}
+
+      ${marketingFooter(unsubscribeToken)}
+    `),
+  }
+}
+
+export async function sendRunningLowEmail(data: RunningLowEmailData) {
+  await deliver(runningLowEmail(data))
 }

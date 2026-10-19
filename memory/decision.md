@@ -348,6 +348,118 @@ then rejects.
 - `manilaDay()` now lives in `lib/deliveryDate.ts` and the chat budget imports
   it, rather than each keeping a copy of the same `Intl` call.
 
+## D15 — Email signups: a ₱50 code for an address, and a running-low reminder
+**Decision:** A homepage form takes an email address and sends a single-use
+₱50 code. Subscribed addresses then get one reminder per delivered order,
+timed from its shot count and delivery date. Email only; SMS deferred (issue
+#39: a PH provider costs per message, not worth it before email converts).
+**Why:** The marketing plan's must-have list. The order data already holds
+everything the reminder needs (shots in the JSONB snapshot,
+`orders.delivery_date`), so the customer is asked nothing beyond an address.
+**Implications:**
+- **Consent is its own thing.** Only the form adds an address. Ordering
+  doesn't, and cookie consent doesn't, because allowing analytics is not
+  agreeing to be emailed. The form shows `SIGNUP_CONSENT`, the server stores
+  that string on the row, and the wording names every kind of email the list
+  gets. A new kind needs the wording changed first. A source test pins
+  `POST /api/subscribe` as the only writer.
+- **Single opt-in, deliberately.** The code is only ever in the inbox, so
+  using it means you can read that mailbox. Someone signing up a stranger gets
+  that stranger exactly one email, which says "didn't sign up? unsubscribe",
+  and nothing more unless they also order. Double opt-in would close that gap
+  at the cost of a click on every real signup. Revisit if a complaint comes in.
+- **"₱50 off a bottle", not "first order".** Enforcing "first" means checking
+  for previous orders by email, and the form can't then answer differently
+  for an existing customer without leaking that the address has ordered. One
+  code per address, ever, any order, is what is actually enforced, and the
+  copy promises only that. Someone with many addresses can still collect many
+  codes. Without accounts that can't be closed, and each code costs at most ₱50
+  on a real delivered order.
+- **Welcome codes are plain vouchers** (`kind = 'welcome'`): `fixed`, ₱50,
+  `max_redemptions = 1`, expiring at the Manila midnight after day 30 so the
+  email's "good until" date is exact. D11's pricing and claiming cover them
+  unchanged. `kind` exists only to keep one-row-per-signup off
+  `/admin/vouchers`.
+- **Public endpoint, bounded:** a honeypot, `MAX_SIGNUPS_PER_DAY` new
+  addresses site-wide (a bounce storm from invented addresses would damage
+  the sending domain that order mail also uses), and at most one welcome send
+  per address. An existing address gets the same response as a new one, so
+  the form can't tell anyone who is subscribed. No per-IP limit: it would mean
+  storing IPs, which /privacy would then have to disclose.
+- **Every once-only step is a claim:** `welcome_sent_at` and
+  `orders.reminder_sent_at` are set by a guarded `UPDATE … RETURNING` before
+  sending and cleared if the send fails. A failed welcome is retried by the
+  next signup from that address, and a failed reminder by the next day's run.
+- **Reminder timing** = `min(shots ÷ SHOTS_PER_DAY, DAYS_FROM_DELIVERY) −
+  MIN_LEAD_DAYS` days after delivery. The coffee-a-day pace is the one
+  assumption, and the freshness cap means it can only make a reminder earlier.
+  Rules: `delivered` only (the email says it arrived), the customer's latest
+  non-cancelled order only, subscribed at send time, and at most
+  `REMINDER_GRACE_DAYS` late.
+- **Unsubscribe:** a page with a button rather than unsubscribing on GET,
+  because mail scanners fetch every link. Plus RFC 8058 one-click headers. The
+  row is kept with `unsubscribed_at` so a re-signup can't mint a second code.
+  Deleting it entirely is a manual request, and /privacy says so.
+- **The checkout voucher race is closed.** Place Order used to be enabled
+  while `/api/vouchers/validate` was in flight, and with a code typed but
+  never applied. Either way the order posted no code and was charged full
+  price next to a summary the customer expected to be discounted. Accepted
+  before (the e2e helper just waited it out). With codes now pasted from an
+  email it would be the normal path, so submit is disabled while checking and
+  refused while a typed code is unapplied.
+
+---
+## D16 — Weekly subscriptions: schedule and controls first, billing undecided
+**Decision:** #38's weekly subscription at 10% off is built *except* for how it
+is paid for and how a customer signs up. What exists: the weekly schedule, the
+price, the customer's own pause/skip/resume/cancel page, the manage link, and a
+weekly subscription-share report on the admin dashboard. Nothing creates a
+`subscriptions` row.
+**Why:** There is no way to charge anyone weekly yet. #21 (PayMongo) isn't
+built, and even with it, whether GCash and Maya can be charged on a schedule is
+unconfirmed: PayMongo's marketing says its Subscriptions product covers cards,
+GCash and Maya, while its developer docs describe charging cards only, after
+an account eligibility review. #38 says outright that a subscription collected
+by COD or by re-scanning a QR every week is worse than shipping none. So
+everything that is true whichever way billing goes is built now, and the
+part that depends on the answer waits for it.
+**Implications:**
+- **Sign-up and billing ship together, or not at all.** `tests/subscriptions.test.ts`
+  fails on any `INSERT INTO subscriptions`; delete that test in the change that
+  adds billing, not before.
+- The schema has **no payment columns** (migration 0013). If PayMongo's
+  subscription product ends up owning the weekly cycle, pause/skip/cancel will
+  have to call it too — check that before wiring billing to the existing
+  controls.
+- Every delivery date comes from `nextOnCadence()`, which only returns dates
+  `validateDeliveryDate()` accepts at that moment — tomorrow at the earliest,
+  Manila time — and keeps the weekday fixed. A stored date that has slipped
+  into the past (a pause, a missed order run) rolls forward whole weeks, never
+  to "whatever is soonest".
+- Skips stack only within the 30-day booking window; beyond that the page says
+  to pause instead.
+- 10% comes off the **bottles only**, floored. Delivery is quoted per order
+  from the pin as usual, and the free-delivery threshold is judged *before*
+  the discount — same rule as a voucher. Subscription orders take no voucher.
+- Items are stored as ids and quantities and priced from `lib/products.ts` at
+  each delivery (D8, D12). A price change therefore reaches existing
+  subscribers on their next delivery — tell them before changing a price.
+- **The manage link is derived, not random**: `HMAC(SUBSCRIPTION_LINK_SECRET,
+  id + version)`, so every weekly email can carry the same link. Only its
+  SHA-256 is stored, it rides in the URL fragment like the review link, and
+  bumping `manage_token_version` revokes a leaked one. The page it opens shows
+  first name, bottles, dates and the bottle price — never an address, phone or
+  email, because these links live in emails and emails get forwarded.
+- Changes are written with the old status *and* date in the `WHERE`, so a
+  customer's skip can't race the order run into delivering a week off.
+- `orders.subscription_id` is what the weekly share report counts. A unique
+  index on `(subscription_id, delivery_date)` makes it impossible for a
+  retried order run to create — or charge — the same week twice.
+- Still to build once billing is decided: sign-up at checkout, the order run
+  (a scheduled job that turns `next_delivery_date` into an order the day
+  before and advances it a week), the manage link in every subscription email,
+  and the `/privacy` rows for the new table.
+
 ---
 ## Open items / known gaps
 - `CLAUDE.md` is out of date (currency, payment, shipping) — update to match code.
@@ -381,6 +493,12 @@ then rejects.
   addresses; when it does, that order also falls back to the flat rate rather
   than blocking checkout. (D10's map pin is the fix for this — but only for
   orders where the customer actually sets the pin.)
+- Email signups (D15) have no per-IP limit, only a site-wide daily ceiling, so
+  a script can use up the day's signups and lock real visitors out until the
+  next day. Fixing that needs either a rate-limit store or an edge/WAF rule.
+- The welcome email is single opt-in (D15).
+- Signups fire no analytics event. Adding one (GA4 `sign_up`, Meta `Lead`)
+  changes what /privacy says trackers receive.
 - Barangay dropdowns don't exist (D10) — free text only, so typos/variant
   spellings aren't caught. Not a correctness issue for pricing (the pin
   decides that), just for the address text stored/emailed/shown to admin.

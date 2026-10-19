@@ -95,6 +95,32 @@ ALTER TABLE orders
 
 UPDATE orders SET paid_at = created_at WHERE payment_status = 'paid' AND paid_at IS NULL;
 
+-- ── Email signups (0009) — see memory/decision.md D15 ──
+
+ALTER TABLE vouchers
+  ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'manual'
+    CONSTRAINT vouchers_kind_chk CHECK (kind IN ('manual', 'welcome'));
+
+CREATE TABLE IF NOT EXISTS email_subscribers (
+  id                SERIAL PRIMARY KEY,
+  email             TEXT NOT NULL,
+  email_key         TEXT NOT NULL UNIQUE,
+  source            TEXT NOT NULL DEFAULT '',
+  consent_text      TEXT NOT NULL,
+  subscribed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  unsubscribed_at   TIMESTAMPTZ,
+  unsubscribe_token TEXT NOT NULL UNIQUE,
+  voucher_id        INTEGER REFERENCES vouchers(id) ON DELETE SET NULL,
+  welcome_sent_at   TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS email_subscribers_created_at_idx ON email_subscribers (created_at);
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS orders_email_key_idx ON orders (lower(trim(email)));
+
 -- ── Reviews (0010) — issue #37 ──
 -- Here as well as in the migration because the delivered transition now
 -- issues a review token, and e2e applies this file rather than migrations.
@@ -120,3 +146,44 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 CREATE INDEX IF NOT EXISTS reviews_moderation_idx ON reviews (moderated_at NULLS FIRST, created_at DESC);
 CREATE INDEX IF NOT EXISTS reviews_product_ids_idx ON reviews USING GIN (product_ids) WHERE approved;
+
+-- ── Subscriptions (0013) — see memory/decision.md D16 ──
+-- Same statements as lib/migrations/0013_add_subscriptions.sql, which carries
+-- the reasoning. Nothing creates a subscription yet: billing comes first.
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                   SERIAL PRIMARY KEY,
+  first_name           TEXT NOT NULL,
+  last_name            TEXT NOT NULL,
+  email                TEXT NOT NULL,
+  phone                TEXT NOT NULL DEFAULT '',
+  address              TEXT NOT NULL DEFAULT '',
+  barangay             TEXT NOT NULL DEFAULT '',
+  city                 TEXT NOT NULL DEFAULT '',
+  province             TEXT NOT NULL DEFAULT '',
+  postal_code          TEXT NOT NULL DEFAULT '',
+  notes                TEXT NOT NULL DEFAULT '',
+  delivery_lat         NUMERIC,
+  delivery_lng         NUMERIC,
+  items                JSONB NOT NULL,
+  delivery_slots       TEXT[] NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'active',
+  next_delivery_date   DATE NOT NULL,
+  manage_token_version INTEGER NOT NULL DEFAULT 1,
+  manage_token_hash    TEXT NOT NULL UNIQUE,
+  paused_at            TIMESTAMPTZ,
+  cancelled_at         TIMESTAMPTZ,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT subscriptions_status_chk CHECK (status IN ('active', 'paused', 'cancelled'))
+);
+
+CREATE INDEX IF NOT EXISTS subscriptions_due_idx
+  ON subscriptions (next_delivery_date) WHERE status = 'active';
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_subscription_delivery_idx
+  ON orders (subscription_id, delivery_date) WHERE subscription_id IS NOT NULL;

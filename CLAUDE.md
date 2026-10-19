@@ -73,6 +73,9 @@ Three transactional emails, all built in `lib/email.ts`:
 | Status → `delivered` | customer, with the review link | `sendOrderStatusEmail()` |
 | Status → `cancelled` | customer | `sendOrderStatusEmail()` |
 
+Marketing mail — the welcome code and the running-low reminder — is separate,
+goes only to people who signed up, and is covered under *Email signups* below.
+
 `approved` deliberately sends nothing — see the comment on
 `NOTIFIED_ORDER_STATUSES`. A cancellation email never shows a delivery address
 or a QR: if the order was paid it offers a refund, if it wasn't it says there is
@@ -104,6 +107,54 @@ triggered it.
 
 Until step 4 passes, leave `RESEND_API_KEY` unset — sends against an unverified
 domain are rejected outright, and the Gmail fallback keeps working meanwhile.
+
+## Email signups & running-low reminder (#39)
+A signup form on the homepage gives an address a single-use ₱50 code by email,
+and the address then gets one reminder per delivered order around when it is
+probably running low. Decision D15.
+
+| Piece | File |
+|---|---|
+| Rules, consent wording, reminder timing (pure) | `lib/subscribe.ts` |
+| Signup, unsubscribe, reminder queries | `lib/subscriberStore.ts` (migration 0009) |
+| Form | `components/EmailSignup.tsx` |
+| Endpoints | `POST /api/subscribe`, `POST /api/unsubscribe`, `GET /api/cron/running-low` |
+| Emails | `welcomeEmail()`, `runningLowEmail()` in `lib/email.ts` |
+| Schedule | `vercel.json` — daily 01:00 UTC (09:00 Manila) |
+
+⚠️ **The form is the only way onto the list.** Ordering doesn't subscribe
+anyone, and neither does accepting cookies — `/privacy` says both, and
+`tests/subscribe.test.ts` fails if anything but `POST /api/subscribe` inserts
+into `email_subscribers`. The wording beside the button is `SIGNUP_CONSENT`,
+and the server stores that same string as the record of consent. Send a new
+kind of email and that wording, and /privacy, change first.
+
+**Welcome codes are ordinary vouchers** (`kind = 'welcome'`, fixed ₱50, one
+redemption, good through the end of a Manila day 30 days out), so
+`POST /api/orders` needs no special case. They're kept off the
+`/admin/vouchers` list; the totals show in a strip above it. One code per
+address, ever: unsubscribing and signing up again issues nothing new.
+
+**Reminder timing:** `shots ÷ SHOTS_PER_DAY` days, capped by the freshness
+window, minus `MIN_LEAD_DAYS` so the next order can arrive as the bottle runs
+out. Only `delivered` orders, only the customer's latest, at most once
+(`orders.reminder_sent_at`), only while subscribed, and at most
+`REMINDER_GRACE_DAYS` late, so launch day doesn't mail every order in history.
+The job reads names and emails from `orders`, which is why it sits behind
+`CRON_SECRET` and refuses to run without one.
+
+**Unsubscribe works from the first send:** a footer link to `/unsubscribe` (a
+page with a button — mail scanners GET every link, so a GET that acted would
+unsubscribe people at random) plus RFC 8058 `List-Unsubscribe` headers for
+Gmail/Yahoo's own button. Marketing mail is never BCC'd to staff: the footer
+link unsubscribes whoever's token it carries.
+
+### Deploy order
+1. Apply `lib/migrations/0009_add_email_subscribers.sql` **before** deploying.
+   `/admin/vouchers` filters on the new `vouchers.kind` column and errors
+   without it.
+2. Set `CRON_SECRET` in Vercel (Production). Without it there are no reminders.
+3. Deploy. Vercel picks up the cron from `vercel.json` (production only).
 
 ## On-site chat
 The widget on the storefront (`components/ChatWidget.tsx`) talks to our own
@@ -224,6 +275,10 @@ loses its guard or the matcher is narrowed.
 
 `login` and `logout` are deliberately unguarded — nobody could sign in
 otherwise.
+
+**The running-low job is the one non-admin route that reads `orders`
+directly** (`reminderCandidates()`), and it is not public: it answers only
+Vercel Cron's `Bearer $CRON_SECRET`.
 
 **Public routes may read `orders`, but only through `lookupOrder()`**
 (`lib/chat/store.ts`), which requires the order number *and* the email on that
@@ -495,6 +550,30 @@ with every event. Verified on the wire for both pixels on 2026-10-11.
   button-click events. `tests/metaPixel.test.ts` fails if it goes.
 - **TikTok has no verified code switch.** Automatic Advanced Matching must be
   off in TikTok Events Manager → pixel → Settings, or `/privacy` is wrong.
+
+## Weekly subscriptions (#38) — not offered yet, on purpose
+The schedule, the 10% price, the customer's manage page and the weekly share
+report exist; **sign-up and billing don't**, and nothing creates a
+`subscriptions` row. Billing is undecided — see `memory/decision.md` D16 before
+touching any of it. `tests/subscriptions.test.ts` fails on any
+`INSERT INTO subscriptions` until the change that adds billing removes it.
+
+| Piece | File |
+|---|---|
+| Schedule, price, pause/skip/resume/cancel rules (pure) | `lib/subscriptions.ts` |
+| Reads, writes, manage token | `lib/subscriptionStore.ts` |
+| Bearer-link helpers (hash, HMAC-derived token) | `lib/linkToken.ts` |
+| Customer manage page | `app/(storefront)/subscription/` (noindex, token in the fragment) |
+| Its endpoint | `app/api/subscriptions/manage/route.ts` |
+| Weekly share report | `getSubscriptionStats()` in `lib/stats.ts`, on `/admin/dashboard` |
+| Schema | migration 0013 — `subscriptions`, `orders.subscription_id` |
+
+**Every subscription date goes through `nextOnCadence()`**, which only returns
+dates `validateDeliveryDate()` accepts. Don't compute one with `addDays` alone.
+
+The manage link is HMAC-derived from `SUBSCRIPTION_LINK_SECRET` so it can be
+re-sent weekly; the view behind it never selects an address, phone or email,
+and a test pins that.
 
 ## Conventions
 - Orders, vouchers, shipping quotes and admin all go through `app/api/*` against Neon Postgres; only the cart is purely client-side

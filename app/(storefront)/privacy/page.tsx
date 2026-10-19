@@ -3,6 +3,7 @@ import { pageMeta } from '@/lib/seo'
 import CookieSettingsLink from '@/components/CookieSettingsLink'
 import { CONTACT_EMAIL, LEGAL_NAME, PRIVACY_UPDATED } from '@/lib/business'
 import { activeTrackerNames, hasAdvertisingTrackers, hasTrackers } from '@/lib/analytics'
+import { SIGNUP_CONSENT, WELCOME_DISCOUNT } from '@/lib/subscribe'
 
 export const metadata = pageMeta({
   title: 'Privacy Policy',
@@ -24,8 +25,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /**
  * Written to match what the code actually does, not from a template — the
- * collection list mirrors the `orders`, `reviews` and `chat_*` tables, and the processor
- * list is every external host the app talks to. If either changes, this page
+ * collection list mirrors the `orders`, `reviews`, `chat_*` and `email_subscribers`
+ * tables, and the processor list is every external host the app talks to. If either changes, this page
  * is wrong until it is updated.
  */
 export default function PrivacyPage() {
@@ -43,7 +44,8 @@ export default function PrivacyPage() {
           <p>
             We collect what we need to deliver coffee to you. We also use analytics and advertising measurement
             tools, but <strong className="text-espresso-800">only if you agree to them</strong> — nothing loads
-            until you accept, and ordering works exactly the same if you decline. We have never sold anyone&apos;s
+            until you accept, and ordering works exactly the same if you decline. We send marketing email only to
+            people who sign up for it, and every one has a one-click unsubscribe. We have never sold anyone&apos;s
             details. If you want your information removed, email us and we will remove it.
           </p>
         </Section>
@@ -56,6 +58,10 @@ export default function PrivacyPage() {
 
           <p><strong className="text-espresso-800">When you use a voucher:</strong> your email address, so codes
           limited to one use per customer can be enforced.</p>
+
+          <p><strong className="text-espresso-800">When you sign up for emails:</strong> your email address, when
+          you signed up and from which form, the exact wording you agreed to, the ₱{WELCOME_DISCOUNT} code we
+          issued you, and when we sent it. If you unsubscribe, we record when.</p>
 
           <p><strong className="text-espresso-800">When you review an order:</strong> your star rating, what you
           wrote, the name you chose to show with it, and which order it was for. We read every review before it is
@@ -112,9 +118,33 @@ export default function PrivacyPage() {
 
         <Section title="Why we hold it">
           <p>To take, price, deliver and confirm your order; to send you order confirmations and delivery updates;
-          to answer your questions; to prevent voucher abuse; to publish the reviews customers choose to write; and
-          to keep ordinary business records of sales.</p>
-          <p>We do not send marketing email. Every email we send relates to an order you actually placed.</p>
+          to answer your questions; to prevent voucher abuse; to publish the reviews customers choose to write; to keep ordinary business
+          records of sales; and, only
+          if you signed up for it, to send the marketing email described below.</p>
+        </Section>
+
+        <Section title="Marketing email">
+          <p>
+            We send marketing email <strong className="text-espresso-800">only to people who sign up for it</strong>{' '}
+            using the email form on our site. Placing an order does not sign you up. Neither does accepting
+            cookies — allowing analytics or advertising cookies is a separate choice and never adds you to our
+            list. The form asks for itself, and says:
+          </p>
+          <blockquote className="border-l border-espresso-200 pl-4 italic text-espresso-700">{SIGNUP_CONSENT}</blockquote>
+          <p>
+            That is all the list is used for. The running-low reminder is timed from orders you have placed with
+            the same email address: how many shots were in a delivered order and the day it arrived. We use that
+            only to decide which day to send it, and we send at most one per order. If you have ordered again
+            since, we don&apos;t send it.
+          </p>
+          <p>
+            <strong className="text-espresso-800">Unsubscribing:</strong> every marketing email has an Unsubscribe
+            link, and most email apps also show their own Unsubscribe button for our emails. Either one stops
+            marketing email straight away. Emails about an order you place keep coming, because they are about
+            that order. After you unsubscribe we keep your address marked as unsubscribed, so that we don&apos;t
+            email you again by mistake and so a second welcome code is never issued to it. If you would rather we
+            delete it entirely, email us.
+          </p>
         </Section>
 
         <Section title="Who else sees it">
@@ -126,8 +156,9 @@ export default function PrivacyPage() {
               address and map pin so a rider can find you, and to price the delivery.</li>
             <li><strong className="text-espresso-800">OpenStreetMap (Nominatim)</strong> — turns the address you type
               into map coordinates. Receives the address text only.</li>
-            <li><strong className="text-espresso-800">Resend and Google (Gmail)</strong> — deliver our order emails.
-              Receive your email address and the contents of that email.</li>
+            <li><strong className="text-espresso-800">Resend and Google (Gmail)</strong> — deliver our emails: order
+              emails and, if you signed up, marketing emails. Receive your email address and the contents of that
+              email.</li>
             <li><strong className="text-espresso-800">Anthropic</strong> — powers the chat assistant. Receives the
               text of chat messages when the assistant answers them. It is not used to train their models.</li>
             <li><strong className="text-espresso-800">{activeTrackerNames().join(', ')}</strong> — analytics
@@ -163,8 +194,10 @@ export default function PrivacyPage() {
 
         <Section title="How long we keep it">
           <p>Order records are kept as long as we need them for business and tax records. Chat conversations are kept
-          so we can follow up on what you asked. Reviews are kept while they are useful to other customers. Ask us to
-          delete any of these and we will, except where we are required to keep a record of a completed sale.</p>
+          so we can follow up on what you asked. Reviews are kept while they are useful to other customers. Your
+          email signup is kept until you ask us to delete it; unsubscribing marks it as unsubscribed, as described
+          above. Ask us to delete any of these and we will, except where we are required to keep a record of a
+          completed sale.</p>
         </Section>
 
         <Section title="Your rights">
