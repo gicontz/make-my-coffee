@@ -197,3 +197,66 @@ export async function getDashboardStats() {
     recentOrders,
   }
 }
+
+// ── Subscription share (#38) ──────────────────────────────────────────────
+//
+// The marketing plan's weekly KPI: what share of orders came from a
+// subscription. Its own function, called separately by the dashboard, so that
+// a database without migration 0013 loses this panel and not the whole page.
+//
+// Same day rules as above: Manila weeks (Monday start, as date_trunc gives),
+// keyed on created_at — when the order was placed. Cancelled orders are left
+// out of both sides, so a burst of cancelled subscription orders can't read as
+// subscription growth.
+
+/** How many Manila weeks the panel shows, this one included. */
+export const SUBSCRIPTION_SHARE_WEEKS = 8
+
+interface ShareWeekRow { week_start: string; orders: number; subscription_orders: number }
+interface SubscriptionCountsRow { active: number; paused: number; cancelled: number }
+
+export async function getSubscriptionStats() {
+  const weeksQuery = sql`
+    WITH weeks AS (
+      SELECT generate_series(
+        date_trunc('week', NOW() AT TIME ZONE 'Asia/Manila') - make_interval(weeks => ${SUBSCRIPTION_SHARE_WEEKS - 1}::int),
+        date_trunc('week', NOW() AT TIME ZONE 'Asia/Manila'),
+        INTERVAL '1 week'
+      )::date AS week_start
+    ),
+    o AS (
+      SELECT date_trunc('week', created_at AT TIME ZONE 'Asia/Manila')::date AS week_start,
+             subscription_id IS NOT NULL                                     AS from_subscription
+      FROM orders
+      WHERE order_status <> 'cancelled'
+    )
+    SELECT
+      w.week_start::text                                         AS week_start,
+      COUNT(o.week_start)::int                                   AS orders,
+      COUNT(o.week_start) FILTER (WHERE o.from_subscription)::int AS subscription_orders
+    FROM weeks w
+    LEFT JOIN o ON o.week_start = w.week_start
+    GROUP BY w.week_start
+    ORDER BY w.week_start DESC
+  `
+
+  const countsQuery = sql`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'active')::int    AS active,
+      COUNT(*) FILTER (WHERE status = 'paused')::int    AS paused,
+      COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled
+    FROM subscriptions
+  `
+
+  const [weekRows, countRows] = await Promise.all([weeksQuery, countsQuery])
+  const [counts] = countRows as SubscriptionCountsRow[]
+
+  return {
+    weeks: (weekRows as ShareWeekRow[]).map(r => ({
+      weekStart: r.week_start,
+      orders: r.orders,
+      subscriptionOrders: r.subscription_orders,
+    })),
+    ...counts,
+  }
+}
