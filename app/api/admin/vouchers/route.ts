@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { isAdminAuthenticated } from '@/lib/session'
 import { validateVoucherInput } from '@/lib/voucherInput'
+import { isUndefinedColumn } from '@/lib/dbErrors'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,16 @@ export async function GET() {
     const rows = await sql`SELECT * FROM vouchers WHERE kind <> 'welcome' ORDER BY created_at DESC`
     return NextResponse.json(rows)
   } catch (err) {
+    // Deployed ahead of migration 0009 (#52): with no `kind` column there are
+    // no welcome codes either, so the unfiltered list is the right answer.
+    if (isUndefinedColumn(err, 'kind')) {
+      console.error('GET /api/admin/vouchers: vouchers.kind missing, apply lib/migrations/0009_add_email_subscribers.sql')
+      try {
+        return NextResponse.json(await sql`SELECT * FROM vouchers ORDER BY created_at DESC`)
+      } catch (fallbackErr) {
+        err = fallbackErr
+      }
+    }
     console.error('GET /api/admin/vouchers error:', err)
     return NextResponse.json({ error: 'Failed to load vouchers' }, { status: 500 })
   }
