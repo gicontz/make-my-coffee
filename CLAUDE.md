@@ -300,6 +300,32 @@ the hamburger. `/admin/login` opts out of the chrome entirely.
 build overwrites `.next` and the dev server then serves `Cannot find module
 './948.js'` error pages that look like real renders to a screenshot script.
 
+### Maintenance brews (#51)
+`/admin/maintenance` logs beans brewed for dialing in, cleaning, calibration
+and testing — never sold, so absent from `orders`, and until this a hidden
+cost. Validation is `lib/maintenanceBrews.ts`; tables are migration 0011.
+
+- A brew is created **In Progress** and the request can't say otherwise. It
+  is then closed once, as **Done** or **Failed**: the UPDATE carries `WHERE
+  status = 'in_progress'`, the same real-transition pattern as order status,
+  so a second click stamps nothing and gets a 409, and done can't flip to
+  failed. `maintenance_brews_closed_chk` ties each status to its own
+  timestamp (`done_at` / `failed_at`).
+- ⚠️ **Failed means it never happened** (the assignee forgot), so its grams
+  are **not beans used** — `gramsUsed()` counts done brews only. A brew that
+  was attempted and ruined *did* use its beans: that is Done, not Failed.
+- **`operators` is seeded and read-only** — no UI or API writes it; adding an
+  operator is a migration. Assignee existence is checked by the INSERT …
+  SELECT itself, not by a separate lookup.
+- **Export CSV** (`GET /api/admin/maintenance-brews/export?from=&to=`, built
+  in `lib/maintenanceExport.ts`) reads the same query as the page
+  (`listMaintenanceBrews()`), so the file can't drift from the screen. The
+  range is Manila days by date logged. ⚠️ Every text cell goes through
+  `csvCell()`, which defuses `= + - @` openers — an activity is typed by
+  staff and the file is opened in Excel, where `=HYPERLINK(...)` runs.
+- Not on `/privacy`: staff first names, no customer data. Revisit if
+  operators ever get an email or phone column.
+
 ## Delivery date & time
 Checkout captures a **required delivery date** (`lib/deliveryDate.ts`) alongside
 the time windows (`lib/deliverySlots.ts`). Stored on `orders.delivery_date`

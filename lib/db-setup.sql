@@ -187,3 +187,35 @@ ALTER TABLE orders
 
 CREATE UNIQUE INDEX IF NOT EXISTS orders_subscription_delivery_idx
   ON orders (subscription_id, delivery_date) WHERE subscription_id IS NOT NULL;
+
+-- ── Maintenance brews (0011) — issue #51 ──
+-- Same statements as lib/migrations/0011_add_maintenance_brews.sql, which
+-- carries the reasoning. operators is seeded here and written by nothing else.
+
+CREATE TABLE IF NOT EXISTS operators (
+  id    SERIAL PRIMARY KEY,
+  name  TEXT NOT NULL UNIQUE
+);
+
+INSERT INTO operators (name) VALUES ('Gim'), ('Gleia'), ('Romel')
+ON CONFLICT (name) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS maintenance_brews (
+  id           SERIAL PRIMARY KEY,
+  activity     TEXT NOT NULL CHECK (char_length(activity) BETWEEN 1 AND 200),
+  beans_grams  INTEGER NOT NULL CHECK (beans_grams > 0),
+  operator_id  INTEGER NOT NULL REFERENCES operators(id),
+  status       TEXT NOT NULL DEFAULT 'in_progress'
+                 CONSTRAINT maintenance_brews_status_chk CHECK (status IN ('in_progress', 'done', 'failed')),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  done_at      TIMESTAMPTZ,
+  failed_at    TIMESTAMPTZ,
+
+  CONSTRAINT maintenance_brews_closed_chk CHECK (
+    (status = 'in_progress' AND done_at IS NULL     AND failed_at IS NULL) OR
+    (status = 'done'        AND done_at IS NOT NULL AND failed_at IS NULL) OR
+    (status = 'failed'      AND failed_at IS NOT NULL AND done_at IS NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS maintenance_brews_created_idx ON maintenance_brews (created_at DESC);
